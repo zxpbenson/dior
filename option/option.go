@@ -1,7 +1,6 @@
 package option
 
 import (
-	"dior/lg"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -9,13 +8,10 @@ import (
 	"strings"
 )
 
-type Logger lg.Logger
-
 type Options struct {
 	// basic options
-	LogLevel  lg.LogLevel `flag:"log-level"`
-	LogPrefix string      `flag:"log-prefix"`
-	Logger    Logger
+	LogLevel  string `flag:"log-level"`
+	LogPrefix string `flag:"log-prefix"`
 
 	Dest                   string   `flag:"dest"` // nsq / writer
 	NSQLookupdTCPAddresses []string `flag:"lookupd-tcp-address"`
@@ -47,7 +43,7 @@ func (this *Options) Validate() error {
 		if fileInfo.IsDir() {
 			return errors.New("It`s a directory : " + this.DataFile)
 		}
-		if fileInfo.Size() == 0 {
+		if fileInfo.Size() < 2 {
 			return errors.New("It`s empty : " + this.DataFile)
 		}
 	}
@@ -57,8 +53,8 @@ func (this *Options) Validate() error {
 	if this.Dest == "nsq" && this.NSQDTCPAddresses == "" && len(this.NSQLookupdTCPAddresses) == 0 {
 		return errors.New("param [lookupd-tcp-address] or [nsqd-tcp-address] : required if dest is nsq")
 	}
-	if this.Dest == "writer" && len(this.KafkaBootstrapServer) == 0 {
-		return errors.New("param [bootstrap-server] : required if dest is writer")
+	if this.Dest == "kafka" && len(this.KafkaBootstrapServer) == 0 {
+		return errors.New("param [bootstrap-server] : required if dest is kafka")
 	}
 	return nil
 }
@@ -68,10 +64,10 @@ func (this *Options) Json() ([]byte, error) {
 }
 
 func NewOptions() *Options {
+	logPrefix := "[dior] "
 	return &Options{
-		LogPrefix: "[dior] ",
-		LogLevel:  lg.INFO,
-
+		LogPrefix:              logPrefix,
+		LogLevel:               "info",
 		NSQLookupdTCPAddresses: make([]string, 0),
 		KafkaBootstrapServer:   make([]string, 0),
 		Speed:                  10,
@@ -81,7 +77,7 @@ func NewOptions() *Options {
 func DiorFlagSet(opts *Options) *flag.FlagSet {
 	flagSet := flag.NewFlagSet("dior", flag.ExitOnError)
 
-	flagSet.IntVar((*int)(&opts.LogLevel), "log-level", int(opts.LogLevel), "set log verbosity: debug, info, warn, error, or fatal")
+	flagSet.StringVar(&opts.LogLevel, "log-level", opts.LogLevel, "set log verbosity: debug, info, warn, error, or fatal")
 	flagSet.StringVar(&opts.LogPrefix, "log-prefix", opts.LogPrefix, "log message prefix")
 
 	flagSet.StringVar(&opts.Dest, "dest", opts.Dest, "target type, options : nsq, writer")

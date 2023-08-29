@@ -1,6 +1,7 @@
 package main
 
 import (
+	"dior/lg"
 	"dior/option"
 	"dior/pressor"
 	"fmt"
@@ -15,17 +16,22 @@ func main() {
 
 	json, _ := opts.Json()
 	if err := opts.Validate(); err != nil {
-		fmt.Printf("config : %s\n, done error : %v\n", json, err)
+		fmt.Printf("config : %s\nparam error : %v\n", json, err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("options : %s\n", json)
-
-	pressWriter, err := pressor.NewPressAble(opts)
+	logger, err := lg.NewLogger(opts.LogPrefix, opts.LogLevel)
 	if err != nil {
-		fmt.Printf("done error : %v\n", err)
+		fmt.Printf("logger create error : %v\n", err)
 		os.Exit(1)
+	}
+
+	logger.Info("options : %s\n", json)
+
+	pressWriter, err := pressor.NewPressor(opts)
+	if err != nil {
+		logger.Fatal("Processor create error : %v\n", err)
 	}
 	pressWriter.Start()
-	fmt.Printf("dior done\n")
+	logger.Info("dior done\n")
 }

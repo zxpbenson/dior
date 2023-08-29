@@ -1,25 +1,30 @@
 package writer
 
 import (
+	"dior/lg"
 	"dior/option"
-	"fmt"
-
 	"github.com/IBM/sarama"
 )
 
 type kafkaWriter struct {
 	opts   *option.Options
 	client sarama.SyncProducer
+	logger lg.Logger
 }
 
 func init() {
 	RegWriteCreator("kafka", newKafkaWriter)
 }
 
-func newKafkaWriter(opts *option.Options) WriteAble {
-	return &kafkaWriter{
-		opts: opts,
+func newKafkaWriter(opts *option.Options) (WriteAble, error) {
+	logger, err := lg.NewLogger(opts.LogPrefix, opts.LogLevel)
+	if err != nil {
+		return nil, err
 	}
+	return &kafkaWriter{
+		opts:   opts,
+		logger: logger,
+	}, nil
 }
 
 func (this *kafkaWriter) Open() (err error) {
@@ -31,7 +36,7 @@ func (this *kafkaWriter) Open() (err error) {
 	// 连接kafka
 	this.client, err = sarama.NewSyncProducer(this.opts.KafkaBootstrapServer, config)
 	if err != nil {
-		fmt.Printf("Producer open err : %v\n", err)
+		this.logger.Error("Producer open err : %v", err)
 		return err
 	}
 	return nil
@@ -42,7 +47,7 @@ func (this *kafkaWriter) Close() error {
 }
 
 func (this *kafkaWriter) Write(data string) error {
-	//fmt.Printf("write to kafka\n")
+	this.logger.Debug("write to kafka : %v", data)
 
 	// 构造一个消息
 	msg := &sarama.ProducerMessage{}
@@ -50,12 +55,11 @@ func (this *kafkaWriter) Write(data string) error {
 	msg.Value = sarama.StringEncoder(data)
 
 	// 发送消息
-	//partitionId, offset, err := this.client.SendMessage(msg)
-	_, _, err := this.client.SendMessage(msg)
+	partitionId, offset, err := this.client.SendMessage(msg)
 	if err != nil {
-		fmt.Printf("send msg failed, err : %v\n", err)
+		this.logger.Error("send msg failed, err : %v", err)
 		return err
 	}
-	//fmt.Printf("pid:%v offset:%v\n", partitionId, offset)
+	this.logger.Debug("pid:%v offset:%v", partitionId, offset)
 	return nil
 }

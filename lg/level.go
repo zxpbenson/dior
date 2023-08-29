@@ -1,10 +1,7 @@
-// short for "log"
 package lg
 
 import (
 	"fmt"
-	"log"
-	"os"
 	"strings"
 )
 
@@ -15,18 +12,6 @@ const (
 	ERROR = LogLevel(4)
 	FATAL = LogLevel(5)
 )
-
-type AppLogFunc func(lvl LogLevel, f string, args ...interface{})
-
-type Logger interface {
-	Output(maxdepth int, s string) error
-}
-
-type NilLogger struct{}
-
-func (l NilLogger) Output(maxdepth int, s string) error {
-	return nil
-}
 
 type LogLevel int
 
@@ -71,17 +56,4 @@ func ParseLogLevel(levelstr string) (LogLevel, error) {
 		return FATAL, nil
 	}
 	return 0, fmt.Errorf("invalid log level '%s' (debug, info, warn, error, fatal)", levelstr)
-}
-
-func Logf(logger Logger, cfgLevel LogLevel, msgLevel LogLevel, f string, args ...interface{}) {
-	if cfgLevel > msgLevel {
-		return
-	}
-	logger.Output(3, fmt.Sprintf(msgLevel.String()+": "+f, args...))
-}
-
-func LogFatal(prefix string, f string, args ...interface{}) {
-	logger := log.New(os.Stderr, prefix, log.Ldate|log.Ltime|log.Lmicroseconds)
-	Logf(logger, FATAL, FATAL, f, args...)
-	os.Exit(1)
 }

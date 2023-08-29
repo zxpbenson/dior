@@ -11,7 +11,7 @@ type WriteAble interface {
 	Write(data string) error
 }
 
-type WriteCreator func(options *option.Options) WriteAble
+type WriteCreator func(options *option.Options) (WriteAble, error)
 
 var writerCreatorMap map[string]WriteCreator = make(map[string]WriteCreator)
 
@@ -28,5 +28,5 @@ func NewWriter(opts *option.Options) (WriteAble, error) {
 	if creator == nil {
 		return nil, errors.New("unsupported type : " + opts.Dest)
 	}
-	return creator(opts), nil
+	return creator(opts)
 }
