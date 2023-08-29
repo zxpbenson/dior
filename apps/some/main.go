@@ -55,6 +55,7 @@ func NewB() I {
 }
 
 func main() {
+        fmt.Printf("start")
 	var i1 I = &A{}
 	var i2 I = &B{
 		A{},
