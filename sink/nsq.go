@@ -18,10 +18,10 @@ type nsqSink struct {
 }
 
 func init() {
-	component.RegCmpCreator("nsq-sink", newnsqSink)
+	component.RegCmpCreator("nsq-sink", newNSQSink)
 }
 
-func newnsqSink(opts *option.Options) (component.Component, error) {
+func newNSQSink(opts *option.Options) (component.Component, error) {
 	return &nsqSink{
 		Asynchronizer:    &component.Asynchronizer{},
 		topic:            opts.DstTopic,
@@ -44,13 +44,13 @@ func (this *nsqSink) Init() (err error) {
 			return err
 		}
 	}
-
-	this.Output = func(data []byte) {
-		this.producers[this.nsqdIndex].Publish(this.topic, data)
-		this.nsqdIndex += 1
-	}
-
+	this.Output = this.output
 	return nil
+}
+
+func (this *nsqSink) output(data []byte) {
+	this.producers[this.nsqdIndex].Publish(this.topic, data)
+	this.nsqdIndex += 1
 }
 
 func (this *nsqSink) Stop() {

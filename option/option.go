@@ -22,13 +22,14 @@ type Options struct {
 	SrcBootstrapServers    []string `flag:"src-bootstrap-servers"`
 	SrcGroup               string   `flag:"src-group"`
 	SrcSpeed               int64    `flag:"src-speed"`
-	SrcDataFile            string   `flag:"src-data-file"`
+	SrcFile                string   `flag:"src-file"`
 
 	Dst                    string   `flag:"dst"` // nsq / kafka
 	DstLookupdTCPAddresses []string `flag:"dst-lookupd-tcp-address"`
 	DstNSQDTCPAddresses    []string `flag:"dst-nsqd-tcp-address"`
 	DstBootstrapServers    []string `flag:"dst-bootstrap-servers"`
 	DstTopic               string   `flag:"dst-topic"`
+	DstFile                string   `flag:"dst-file"`
 }
 
 func (this *Options) Validate() error {
@@ -99,7 +100,7 @@ func FlagSet(opts *Options) *flag.FlagSet {
 	flagSet.StringVar(&opts.SrcGroup, "src-group", opts.SrcGroup, "source group of kafka consumer")
 
 	flagSet.Int64Var(&opts.SrcSpeed, "src-speed", opts.SrcSpeed, "speed of data writing per seconds, >= 0, 0 means as fast as possible")
-	flagSet.StringVar(&opts.SrcDataFile, "src-data-file", opts.SrcDataFile, "path of file to read data")
+	flagSet.StringVar(&opts.SrcFile, "src-file", opts.SrcFile, "path of file to read data for source")
 
 	flagSet.StringVar(&opts.Dst, "dst", opts.Dst, "destination type, options : nsq, kafka")
 
@@ -126,6 +127,7 @@ func FlagSet(opts *Options) *flag.FlagSet {
 		opts.DstBootstrapServers = strings.Split(s, ",")
 		return nil
 	})
+	flagSet.StringVar(&opts.DstFile, "dst-file", opts.SrcFile, "path of file to write data for sink")
 
 	return flagSet
 }
@@ -184,21 +186,21 @@ func (this *Options) validateSrcPress() error {
 	if this.SrcSpeed < 0 {
 		return errors.New("param [src-speed] : >= 0")
 	}
-	if this.SrcDataFile == "" {
-		return errors.New("param [src-data-file] : required")
+	if this.SrcFile == "" {
+		return errors.New("param [src-file] : required")
 	} else {
-		fileInfo, err := os.Stat(this.SrcDataFile)
+		fileInfo, err := os.Stat(this.SrcFile)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return errors.New("File not exists : " + this.SrcDataFile)
+				return errors.New("SrcFile not exists : " + this.SrcFile)
 			}
-			return err
+			return errors.Join(err, errors.New("SrcFile access error : "+this.DstFile))
 		}
 		if fileInfo.IsDir() {
-			return errors.New("It`s a directory : " + this.SrcDataFile)
+			return errors.New("SrcFile It`s a directory : " + this.SrcFile)
 		}
 		if fileInfo.Size() < 2 {
-			return errors.New("It`s empty : " + this.SrcDataFile)
+			return errors.New("SrcFile It`s empty : " + this.SrcFile)
 		}
 	}
 	return nil
@@ -206,8 +208,8 @@ func (this *Options) validateSrcPress() error {
 
 func (this *Options) validateDst() error {
 	this.Dst = strings.ToLower(this.Dst)
-	if this.Dst != "nsq" && this.Dst != "kafka" {
-		return errors.New("param [dst] : nsq, kafka")
+	if this.Dst != "nsq" && this.Dst != "kafka" && this.Dst != "nil" && this.Dst != "file" {
+		return errors.New("param [dst] : nsq, kafka, nil, file")
 	}
 
 	if this.Dst == "kafka" {
@@ -217,6 +219,13 @@ func (this *Options) validateDst() error {
 	}
 	if this.Dst == "nsq" {
 		if err := this.validateDstNSQ(); err != nil {
+			return err
+		}
+	}
+	if this.Dst == "nil" {
+	}
+	if this.Dst == "file" {
+		if err := this.validateDstFile(); err != nil {
 			return err
 		}
 	}
@@ -239,6 +248,29 @@ func (this *Options) validateDstNSQ() error {
 	}
 	if this.DstTopic == "" {
 		return errors.New("param [dst-topic] : required")
+	}
+	return nil
+}
+
+func (this *Options) validateDstFile() error {
+	if this.DstFile == "" {
+		return errors.New("param [dst-file] : required")
+	} else {
+		//fileInfo, err := os.Stat(this.DstFile)
+		_, err := os.Stat(this.DstFile)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return errors.Join(err, errors.New("DstFile access error : "+this.DstFile))
+		}
+		return errors.New("DstFile exists : " + this.DstFile)
+		//if fileInfo.IsDir() {
+		//	return errors.New("DstFile It`s a directory : " + this.DstFile)
+		//}
+		//if fileInfo.Size() > 1 {
+		//	return errors.New("DstFile`s not empty : " + this.DstFile)
+		//}
 	}
 	return nil
 }
