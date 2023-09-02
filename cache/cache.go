@@ -10,7 +10,7 @@ type Ticket struct {
 }
 
 type Cache struct {
-	data []string
+	data [][]byte
 	size uint32
 }
 
@@ -48,7 +48,7 @@ func (cache *Cache) Load(path string) error {
 		if line == "" {
 			break
 		}
-		cache.data = append(cache.data, line)
+		cache.data = append(cache.data, []byte(line))
 		cache.size++
 	}
 	err = scanner.Err()
@@ -58,7 +58,7 @@ func (cache *Cache) Load(path string) error {
 
 	return err
 }
-func (cache *Cache) Next(ticket *Ticket) string {
+func (cache *Cache) Next(ticket *Ticket) []byte {
 	index := ticket.Index(cache.size)
 	return cache.data[index]
 }

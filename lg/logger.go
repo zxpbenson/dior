@@ -3,6 +3,7 @@ package lg
 import (
 	"log"
 	"os"
+	"sync"
 )
 
 type Logger interface {
@@ -13,6 +14,7 @@ type Logger interface {
 	Warn(f string, args ...interface{})
 	Error(f string, args ...interface{})
 	Fatal(f string, args ...interface{})
+	Enable(msgLevel LogLevel) bool
 }
 
 func NewLogger(logPrefix string, cfgLevel string) (Logger, error) {
@@ -25,4 +27,19 @@ func NewLogger(logPrefix string, cfgLevel string) (Logger, error) {
 		cfgLevel:  logLevel,
 		appender:  log.New(os.Stdout, logPrefix, log.Ldate|log.Ltime|log.Lmicroseconds),
 	}, nil
+}
+
+var DftLgr Logger = nil
+var mutex sync.Mutex
+
+func InitDftLgr(logPrefix string, cfgLevel string) (err error) {
+	if DftLgr == nil {
+		mutex.Lock()
+		defer mutex.Unlock()
+		if DftLgr == nil {
+			DftLgr, err = NewLogger(logPrefix, cfgLevel)
+			return
+		}
+	}
+	return
 }

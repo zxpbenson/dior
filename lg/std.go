@@ -47,3 +47,7 @@ func (this *StdtLogger) Fatal(f string, args ...interface{}) {
 	this.append_logf(appender, FATAL, f, args...)
 	os.Exit(1)
 }
+
+func (this *StdtLogger) Enable(msgLevel LogLevel) bool {
+	return msgLevel >= this.cfgLevel
+}

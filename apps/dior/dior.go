@@ -1,17 +1,24 @@
 package main
 
 import (
+	"dior/component"
 	"dior/lg"
 	"dior/option"
-	"dior/pressor"
+	"dior/sink"
+	"dior/source"
 	"fmt"
 	"os"
 )
 
-func main() {
-	opts := option.NewOptions()
+func init() {
+	source.TriggerInit()
+	sink.TriggerInit()
+}
 
-	flagSet := option.DiorFlagSet(opts)
+func main() {
+	opts := option.NewOptions("dior")
+
+	flagSet := option.FlagSet(opts)
 	flagSet.Parse(os.Args[1:])
 
 	json, _ := opts.Json()
@@ -20,18 +27,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger, err := lg.NewLogger(opts.LogPrefix, opts.LogLevel)
+	err := lg.InitDftLgr(opts.LogPrefix, opts.LogLevel)
 	if err != nil {
-		fmt.Printf("logger create error : %v\n", err)
+		fmt.Printf("main goroutine logger create error : %v\n", err)
 		os.Exit(1)
 	}
 
-	logger.Info("options : %s\n", json)
+	lg.DftLgr.Info("options : %s\n", json)
 
-	pressWriter, err := pressor.NewPressor(opts)
-	if err != nil {
-		logger.Fatal("Processor create error : %v\n", err)
-	}
-	pressWriter.Start()
-	logger.Info("dior done\n")
+	controller := component.NewController()
+	controller.AddComponents(opts)
+	controller.Init()
+	controller.Start()
+
+	lg.DftLgr.Info("main goroutine dior done\n")
 }

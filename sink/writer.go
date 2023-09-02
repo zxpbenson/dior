@@ -1,0 +1,5 @@
+package sink
+
+func TriggerInit() {
+
+}

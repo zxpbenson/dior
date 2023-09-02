@@ -10,51 +10,33 @@ import (
 
 type Options struct {
 	// basic options
+	app       string
 	LogLevel  string `flag:"log-level"`
 	LogPrefix string `flag:"log-prefix"`
 
-	Dest                   string   `flag:"dest"` // nsq / writer
-	NSQLookupdTCPAddresses []string `flag:"lookupd-tcp-address"`
-	NSQDTCPAddresses       string   `flag:"nsqd-tcp-address"`
-	KafkaBootstrapServer   []string `flag:"bootstrap-server"`
-	Topic                  string   `flag:"topic"`
-	Speed                  int64    `flag:"speed"`
-	DataFile               string   `flag:"data-file"`
+	Src                    string   `flag:"src"` // nsq / kafka / press
+	SrcTopic               string   `flag:"src-topic"`
+	SrcLookupdTCPAddresses []string `flag:"src-lookupd-tcp-addresses"`
+	SrcNSQDTCPAddresses    []string `flag:"src-nsqd-tcp-addresses"`
+	SrcChannel             string   `flag:"src-channel"`
+	SrcBootstrapServers    []string `flag:"src-bootstrap-servers"`
+	SrcGroup               string   `flag:"src-group"`
+	SrcSpeed               int64    `flag:"src-speed"`
+	SrcDataFile            string   `flag:"src-data-file"`
+
+	Dst                    string   `flag:"dst"` // nsq / kafka
+	DstLookupdTCPAddresses []string `flag:"dst-lookupd-tcp-address"`
+	DstNSQDTCPAddresses    []string `flag:"dst-nsqd-tcp-address"`
+	DstBootstrapServers    []string `flag:"dst-bootstrap-servers"`
+	DstTopic               string   `flag:"dst-topic"`
 }
 
 func (this *Options) Validate() error {
-	this.Dest = strings.ToLower(this.Dest)
-	if this.Dest != "nsq" && this.Dest != "kafka" {
-		return errors.New("param [dest] : nsq, kafka")
+	if err := this.validateSrc(); err != nil {
+		return err
 	}
-	if this.Topic == "" {
-		return errors.New("param [topic] : required")
-	}
-	if this.DataFile == "" {
-		return errors.New("param [data-file] : required")
-	} else {
-		fileInfo, err := os.Stat(this.DataFile)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return errors.New("File not exists : " + this.DataFile)
-			}
-			return err
-		}
-		if fileInfo.IsDir() {
-			return errors.New("It`s a directory : " + this.DataFile)
-		}
-		if fileInfo.Size() < 2 {
-			return errors.New("It`s empty : " + this.DataFile)
-		}
-	}
-	if this.Speed < 0 {
-		return errors.New("param [speed] : >= 0")
-	}
-	if this.Dest == "nsq" && this.NSQDTCPAddresses == "" && len(this.NSQLookupdTCPAddresses) == 0 {
-		return errors.New("param [lookupd-tcp-address] or [nsqd-tcp-address] : required if dest is nsq")
-	}
-	if this.Dest == "kafka" && len(this.KafkaBootstrapServer) == 0 {
-		return errors.New("param [bootstrap-server] : required if dest is kafka")
+	if err := this.validateDst(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -63,46 +45,200 @@ func (this *Options) Json() ([]byte, error) {
 	return json.Marshal(this)
 }
 
-func NewOptions() *Options {
-	logPrefix := "[dior] "
+func NewOptions(app string) *Options {
+	logPrefix := "[" + app + "] "
 	return &Options{
-		LogPrefix:              logPrefix,
-		LogLevel:               "info",
-		NSQLookupdTCPAddresses: make([]string, 0),
-		KafkaBootstrapServer:   make([]string, 0),
-		Speed:                  10,
+		app:       app,
+		LogPrefix: logPrefix,
+		LogLevel:  "info",
+
+		SrcLookupdTCPAddresses: make([]string, 0),
+		SrcNSQDTCPAddresses:    make([]string, 0),
+		SrcBootstrapServers:    make([]string, 0),
+		SrcSpeed:               10,
+
+		DstLookupdTCPAddresses: make([]string, 0),
+		DstNSQDTCPAddresses:    make([]string, 0),
+		DstBootstrapServers:    make([]string, 0),
 	}
 }
 
-func DiorFlagSet(opts *Options) *flag.FlagSet {
-	flagSet := flag.NewFlagSet("dior", flag.ExitOnError)
+func FlagSet(opts *Options) *flag.FlagSet {
+	flagSet := flag.NewFlagSet(opts.app, flag.ExitOnError)
 
 	flagSet.StringVar(&opts.LogLevel, "log-level", opts.LogLevel, "set log verbosity: debug, info, warn, error, or fatal")
 	flagSet.StringVar(&opts.LogPrefix, "log-prefix", opts.LogPrefix, "log message prefix")
 
-	flagSet.StringVar(&opts.Dest, "dest", opts.Dest, "target type, options : nsq, writer")
+	flagSet.StringVar(&opts.Src, "src", opts.Src, "source type, options : nsq, kafka, press")
 
-	flagSet.Func("lookupd-tcp-address", "<addr>:<port>[,<addr>:<port>] to connect for nsq clients", func(s string) error {
+	flagSet.StringVar(&opts.SrcTopic, "src-topic", opts.SrcTopic, "source topic of nsq or kafka")
+
+	flagSet.Func("src-lookupd-tcp-address", "<addr>:<port>[,<addr>:<port>] to connect for source of nsq client", func(s string) error {
 		if s == "" {
 			return nil
 		}
-		opts.NSQLookupdTCPAddresses = strings.Split(s, ",")
+		opts.SrcLookupdTCPAddresses = strings.Split(s, ",")
 		return nil
 	})
-
-	flagSet.StringVar(&opts.NSQDTCPAddresses, "nsqd-tcp-address", opts.NSQDTCPAddresses, "<addr>:<port> to connect to for nsq clients")
-
-	flagSet.Func("bootstrap-server", "<addr>:<port>[,<addr>:<port>] to connect for writer clients", func(s string) error {
+	flagSet.Func("src-nsqd-tcp-address", "<addr>:<port>[,<addr>:<port>] to connect for source of nsq client", func(s string) error {
 		if s == "" {
 			return nil
 		}
-		opts.KafkaBootstrapServer = strings.Split(s, ",")
+		opts.SrcNSQDTCPAddresses = strings.Split(s, ",")
 		return nil
 	})
+	flagSet.StringVar(&opts.SrcChannel, "src-channel", opts.SrcChannel, "source channel of nsq consumer")
 
-	flagSet.StringVar(&opts.Topic, "topic", opts.Topic, "target topic of nsq or writer")
-	flagSet.Int64Var(&opts.Speed, "speed", opts.Speed, "speed of data writing per seconds, >= 0")
-	flagSet.StringVar(&opts.DataFile, "data-file", opts.DataFile, "path to data file")
+	flagSet.Func("src-bootstrap-servers", "<addr>:<port>[,<addr>:<port>] to connect for source of kafka client", func(s string) error {
+		if s == "" {
+			return nil
+		}
+		opts.SrcBootstrapServers = strings.Split(s, ",")
+		return nil
+	})
+	flagSet.StringVar(&opts.SrcGroup, "src-group", opts.SrcGroup, "source group of kafka consumer")
+
+	flagSet.Int64Var(&opts.SrcSpeed, "src-speed", opts.SrcSpeed, "speed of data writing per seconds, >= 0, 0 means as fast as possible")
+	flagSet.StringVar(&opts.SrcDataFile, "src-data-file", opts.SrcDataFile, "path of file to read data")
+
+	flagSet.StringVar(&opts.Dst, "dst", opts.Dst, "destination type, options : nsq, kafka")
+
+	flagSet.StringVar(&opts.DstTopic, "dst-topic", opts.DstTopic, "destination topic of nsq or kafka")
+
+	flagSet.Func("dst-lookupd-tcp-address", "<addr>:<port>[,<addr>:<port>] to connect for sink of nsq client", func(s string) error {
+		if s == "" {
+			return nil
+		}
+		opts.DstLookupdTCPAddresses = strings.Split(s, ",")
+		return nil
+	})
+	flagSet.Func("dst-nsqd-tcp-address", "<addr>:<port>[,<addr>:<port>] to connect for sink of nsq client", func(s string) error {
+		if s == "" {
+			return nil
+		}
+		opts.DstNSQDTCPAddresses = strings.Split(s, ",")
+		return nil
+	})
+	flagSet.Func("dst-bootstrap-servers", "<addr>:<port>[,<addr>:<port>] to connect for sink of kafka client", func(s string) error {
+		if s == "" {
+			return nil
+		}
+		opts.DstBootstrapServers = strings.Split(s, ",")
+		return nil
+	})
 
 	return flagSet
+}
+
+func (this *Options) validateSrc() error {
+	this.Src = strings.ToLower(this.Src)
+
+	if this.Src != "nsq" && this.Src != "kafka" && this.Src != "press" {
+		return errors.New("param [src] : nsq, kafka, press")
+	}
+	if this.Src == "kafka" {
+		if err := this.validateSrcKafka(); err != nil {
+			return err
+		}
+	}
+	if this.Src == "nsq" {
+		if err := this.validateSrcNSQ(); err != nil {
+			return err
+		}
+	}
+	if this.Src == "press" {
+		if err := this.validateSrcPress(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (this *Options) validateSrcKafka() error {
+	if len(this.SrcBootstrapServers) == 0 {
+		return errors.New("param [src-bootstrap-servers] : required")
+	}
+	if this.SrcGroup == "" {
+		return errors.New("param [src-group] : required")
+	}
+	if this.SrcTopic == "" {
+		return errors.New("param [src-topic] : required")
+	}
+	return nil
+}
+
+func (this *Options) validateSrcNSQ() error {
+	if len(this.SrcLookupdTCPAddresses) == 0 && len(this.SrcNSQDTCPAddresses) == 0 {
+		return errors.New("param [src-lookupd-tcp-addresses] or [src-nsqd-tcp-addresses] : required")
+	}
+	if this.SrcChannel == "" {
+		return errors.New("param [src-channel] : required")
+	}
+	if this.SrcTopic == "" {
+		return errors.New("param [src-topic] : required")
+	}
+	return nil
+}
+
+func (this *Options) validateSrcPress() error {
+	if this.SrcSpeed < 0 {
+		return errors.New("param [src-speed] : >= 0")
+	}
+	if this.SrcDataFile == "" {
+		return errors.New("param [src-data-file] : required")
+	} else {
+		fileInfo, err := os.Stat(this.SrcDataFile)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return errors.New("File not exists : " + this.SrcDataFile)
+			}
+			return err
+		}
+		if fileInfo.IsDir() {
+			return errors.New("It`s a directory : " + this.SrcDataFile)
+		}
+		if fileInfo.Size() < 2 {
+			return errors.New("It`s empty : " + this.SrcDataFile)
+		}
+	}
+	return nil
+}
+
+func (this *Options) validateDst() error {
+	this.Dst = strings.ToLower(this.Dst)
+	if this.Dst != "nsq" && this.Dst != "kafka" {
+		return errors.New("param [dst] : nsq, kafka")
+	}
+
+	if this.Dst == "kafka" {
+		if err := this.validateDstKafka(); err != nil {
+			return err
+		}
+	}
+	if this.Dst == "nsq" {
+		if err := this.validateDstNSQ(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (this *Options) validateDstKafka() error {
+	if len(this.DstBootstrapServers) == 0 {
+		return errors.New("param [dst-bootstrap-servers] : required")
+	}
+	if this.DstTopic == "" {
+		return errors.New("param [dst-topic] : required")
+	}
+	return nil
+}
+
+func (this *Options) validateDstNSQ() error {
+	if len(this.DstLookupdTCPAddresses) == 0 && len(this.DstNSQDTCPAddresses) == 0 {
+		return errors.New("param [dst-lookupd-tcp-addresses] or [dst-nsqd-tcp-addresses] : required")
+	}
+	if this.DstTopic == "" {
+		return errors.New("param [dst-topic] : required")
+	}
+	return nil
 }
