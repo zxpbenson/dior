@@ -36,7 +36,7 @@ func (this *Controller) AddComponents(opts *option.Options) {
 	if err != nil {
 		lg.DftLgr.Fatal("Controller.AddComponents create sink fail : %v", err)
 	}
-	channel := make(chan []byte, 100)
+	channel := make(chan []byte, opts.ChanSize)
 	this.AddIO(source, channel, sink)
 }
 

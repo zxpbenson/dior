@@ -24,6 +24,8 @@ type Options struct {
 	SrcSpeed               int64    `flag:"src-speed"`
 	SrcFile                string   `flag:"src-file"`
 
+	ChanSize int `flag:"chan-size"`
+
 	Dst                    string   `flag:"dst"` // nsq / kafka
 	DstLookupdTCPAddresses []string `flag:"dst-lookupd-tcp-address"`
 	DstNSQDTCPAddresses    []string `flag:"dst-nsqd-tcp-address"`
@@ -36,6 +38,11 @@ func (this *Options) Validate() error {
 	if err := this.validateSrc(); err != nil {
 		return err
 	}
+
+	if this.ChanSize < 0 {
+		return errors.New("param [chan-size] : >= 0")
+	}
+
 	if err := this.validateDst(); err != nil {
 		return err
 	}
@@ -57,6 +64,8 @@ func NewOptions(app string) *Options {
 		SrcNSQDTCPAddresses:    make([]string, 0),
 		SrcBootstrapServers:    make([]string, 0),
 		SrcSpeed:               10,
+
+		ChanSize: 100,
 
 		DstLookupdTCPAddresses: make([]string, 0),
 		DstNSQDTCPAddresses:    make([]string, 0),
@@ -101,6 +110,8 @@ func FlagSet(opts *Options) *flag.FlagSet {
 
 	flagSet.Int64Var(&opts.SrcSpeed, "src-speed", opts.SrcSpeed, "speed of data writing per seconds, >= 0, 0 means as fast as possible")
 	flagSet.StringVar(&opts.SrcFile, "src-file", opts.SrcFile, "path of file to read data for source")
+
+	flagSet.IntVar(&opts.ChanSize, "chan-size", opts.ChanSize, "size of queue bwtween source and sink, >= 0, 0 means non blocking queue")
 
 	flagSet.StringVar(&opts.Dst, "dst", opts.Dst, "destination type, options : nsq, kafka")
 
