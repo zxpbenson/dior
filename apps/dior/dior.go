@@ -40,5 +40,5 @@ func main() {
 	controller.Init()
 	controller.Start()
 
-	lg.DftLgr.Info("main goroutine dior done\n")
+	lg.DftLgr.Info("Main goroutine done, bye.\n")
 }
