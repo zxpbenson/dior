@@ -83,14 +83,14 @@ func FlagSet(opts *Options) *flag.FlagSet {
 
 	flagSet.StringVar(&opts.SrcTopic, "src-topic", opts.SrcTopic, "source topic of nsq or kafka")
 
-	flagSet.Func("src-lookupd-tcp-address", "<addr>:<port>[,<addr>:<port>] to connect for source of nsq client", func(s string) error {
+	flagSet.Func("src-lookupd-tcp-addresses", "<addr>:<port>[,<addr>:<port>] to connect for source of nsq client", func(s string) error {
 		if s == "" {
 			return nil
 		}
 		opts.SrcLookupdTCPAddresses = strings.Split(s, ",")
 		return nil
 	})
-	flagSet.Func("src-nsqd-tcp-address", "<addr>:<port>[,<addr>:<port>] to connect for source of nsq client", func(s string) error {
+	flagSet.Func("src-nsqd-tcp-addresses", "<addr>:<port>[,<addr>:<port>] to connect for source of nsq client", func(s string) error {
 		if s == "" {
 			return nil
 		}
@@ -117,14 +117,14 @@ func FlagSet(opts *Options) *flag.FlagSet {
 
 	flagSet.StringVar(&opts.DstTopic, "dst-topic", opts.DstTopic, "destination topic of nsq or kafka")
 
-	flagSet.Func("dst-lookupd-tcp-address", "<addr>:<port>[,<addr>:<port>] to connect for sink of nsq client", func(s string) error {
+	flagSet.Func("dst-lookupd-tcp-addresses", "<addr>:<port>[,<addr>:<port>] to connect for sink of nsq client", func(s string) error {
 		if s == "" {
 			return nil
 		}
 		opts.DstLookupdTCPAddresses = strings.Split(s, ",")
 		return nil
 	})
-	flagSet.Func("dst-nsqd-tcp-address", "<addr>:<port>[,<addr>:<port>] to connect for sink of nsq client", func(s string) error {
+	flagSet.Func("dst-nsqd-tcp-addresses", "<addr>:<port>[,<addr>:<port>] to connect for sink of nsq client", func(s string) error {
 		if s == "" {
 			return nil
 		}

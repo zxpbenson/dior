@@ -50,7 +50,7 @@ func (this *nsqSink) Init() (err error) {
 
 func (this *nsqSink) output(data []byte) {
 	this.producers[this.nsqdIndex].Publish(this.topic, data)
-	this.nsqdIndex += 1
+	this.nsqdIndex = (this.nsqdIndex + 1) % this.nsqdLen
 }
 
 func (this *nsqSink) Stop() {
