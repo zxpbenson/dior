@@ -25,26 +25,103 @@
 * GNU Make 3.81
 
 ## 使用方式Usage
-### file to file
 
-<pre>./build/dior -src press --src-file source.txt --src-speed 10 --dst file --dst-file sink.txt</pre>
+### press kafka
+
+<pre>
+./build/dior \
+--src press \
+--src-file source.txt \
+--src-speed 10 \
+--dst kafka \
+--dst-bootstrap-servers 127.0.0.1:9092 \
+--dst-topic topic_to
+</pre>
+
+### press nsq
+
+<pre>
+./build/dior \
+--src press \
+--src-file source.txt \
+--src-speed 10 \
+--dst nsq \
+--dst-nsqd-tcp-addresses 127.0.0.1:4150 \
+--dst-topic topic_to
+</pre>
 
 ### kafka to kafka
 
-<pre>./build/dior -src kafka --src-bootstrap-servers./build/dior -src press --src-data-file data.txt --src-speed 1000 --dst kafka --dst-bootstrap-servers 127.0.0.1:9092 --dst-topic topic_to</pre>
+<pre>
+./build/dior \
+--src kafka \
+--src-bootstrap-servers 127.0.0.1:9092 \
+--src-topic topic_from \
+--src-group benson \
+--dst kafka \
+--dst-bootstrap-servers 127.0.0.1:9092 \
+--dst-topic topic_to
+</pre>
 
-### kafka to file
+### nsq to nsq
 
-<pre></pre>
-
-### nsq to file
-
-<pre></pre>
+<pre>
+./build/dior \
+--src nsq \
+--dst-nsqd-tcp-addresses 127.0.0.1:4150 \
+--src-topic topic_from \
+--src-channel benson \
+--dst nsq \
+--dst-nsqd-tcp-addresses 127.0.0.1:4150 \
+--dst-topic topic_to
+</pre>
 
 ### kafka to nsq
 
-<pre></pre>
+<pre>
+./build/dior \
+--src kafka \
+--src-bootstrap-servers 127.0.0.1:9092 \
+--src-topic topic_from \
+--src-group benson \
+--dst nsq \
+--dst-nsqd-tcp-addresses 127.0.0.1:4150 \
+--dst-topic topic_to
+</pre>
 
 ### nsq to kafka
 
-<pre></pre>
+<pre>
+./build/dior \
+--src nsq \
+--dst-nsqd-tcp-addresses 127.0.0.1:4150 \
+--src-topic topic_from \
+--src-channel benson \
+--dst kafka \
+--dst-bootstrap-servers 127.0.0.1:9092 \
+--dst-topic topic_to
+</pre>
+
+### kafka to file
+
+<pre>
+./build/dior \
+--src kafka \
+--src-bootstrap-servers 127.0.0.1:9092 \
+--src-topic topic_from \
+--src-group benson \
+--dst file \
+--dst-file sink.txt
+</pre>
+
+### nsq to file
+
+<pre>
+./build/dior \
+--src nsq \
+--dst-nsqd-tcp-addresses 127.0.0.1:4150 \
+--src-topic topic_from \
+--src-channel benson \
+--dst file \
+--dst-file sink.txt
+</pre>
