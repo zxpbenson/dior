@@ -27,7 +27,7 @@ func newFileSink(opts *option.Options) (component.Component, error) {
 		Asynchronizer: &component.Asynchronizer{},
 		fileName:      opts.DstFile,
 		splitter:      []byte("\n"),
-		bufSize:       4096,
+		bufSize:       opts.DstBufSizeByte,
 	}, nil
 }
 

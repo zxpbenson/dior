@@ -1,5 +1,1 @@
 package sink
-
-func TriggerInit() {
-
-}

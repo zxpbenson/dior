@@ -32,6 +32,7 @@ type Options struct {
 	DstBootstrapServers    []string `flag:"dst-bootstrap-servers"`
 	DstTopic               string   `flag:"dst-topic"`
 	DstFile                string   `flag:"dst-file"`
+	DstBufSizeByte         int      `flag:"dst-buf-size-byte"`
 }
 
 func (this *Options) Validate() error {
@@ -70,6 +71,7 @@ func NewOptions(app string) *Options {
 		DstLookupdTCPAddresses: make([]string, 0),
 		DstNSQDTCPAddresses:    make([]string, 0),
 		DstBootstrapServers:    make([]string, 0),
+		DstBufSizeByte:         4096,
 	}
 }
 
@@ -108,10 +110,10 @@ func FlagSet(opts *Options) *flag.FlagSet {
 	})
 	flagSet.StringVar(&opts.SrcGroup, "src-group", opts.SrcGroup, "source group of kafka consumer")
 
-	flagSet.Int64Var(&opts.SrcSpeed, "src-speed", opts.SrcSpeed, "speed of data writing per seconds, >= 0, 0 means as fast as possible")
+	flagSet.Int64Var(&opts.SrcSpeed, "src-speed", opts.SrcSpeed, "speed of data writing per seconds, >= 0, 0 means as fast as possible，default 10")
 	flagSet.StringVar(&opts.SrcFile, "src-file", opts.SrcFile, "path of file to read data for source")
 
-	flagSet.IntVar(&opts.ChanSize, "chan-size", opts.ChanSize, "size of queue bwtween source and sink, >= 0, 0 means non blocking queue")
+	flagSet.IntVar(&opts.ChanSize, "chan-size", opts.ChanSize, "size of queue between source and sink, >= 0, 0 means non blocking queue")
 
 	flagSet.StringVar(&opts.Dst, "dst", opts.Dst, "destination type, options : nsq, kafka")
 
@@ -139,7 +141,7 @@ func FlagSet(opts *Options) *flag.FlagSet {
 		return nil
 	})
 	flagSet.StringVar(&opts.DstFile, "dst-file", opts.SrcFile, "path of file to write data for sink")
-
+	flagSet.IntVar(&opts.DstBufSizeByte, "dst-buf-size-byte", opts.DstBufSizeByte, "buf size of sink writer, >= 0, default 4096")
 	return flagSet
 }
 
@@ -282,6 +284,9 @@ func (this *Options) validateDstFile() error {
 		//if fileInfo.Size() > 1 {
 		//	return errors.New("DstFile`s not empty : " + this.DstFile)
 		//}
+	}
+	if this.DstBufSizeByte < 0 {
+		return errors.New("param [dst-buf-size-byte] : >= 0")
 	}
 	return nil
 }

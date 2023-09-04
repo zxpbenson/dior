@@ -4,16 +4,11 @@ import (
 	"dior/component"
 	"dior/lg"
 	"dior/option"
-	"dior/sink"
-	"dior/source"
+	_ "dior/sink"
+	_ "dior/source"
 	"fmt"
 	"os"
 )
-
-func init() {
-	source.TriggerInit()
-	sink.TriggerInit()
-}
 
 func main() {
 	opts := option.NewOptions("dior")
