@@ -24,7 +24,7 @@ func main() {
 
 	err := lg.InitDftLgr(opts.LogPrefix, opts.LogLevel)
 	if err != nil {
-		fmt.Printf("main goroutine logger create error : %v\n", err)
+		fmt.Printf("main.go goroutine logger create error : %v\n", err)
 		os.Exit(1)
 	}
 
