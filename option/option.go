@@ -63,6 +63,10 @@ func NewOptions(app string) *Options {
 func FlagSet(opts *Options) *flag.FlagSet {
 	flagSet := flag.NewFlagSet(opts.app, flag.ExitOnError)
 
+	version, help := false, false
+	flagSet.BoolVar(&version, "version", false, "show dior version")
+	flagSet.BoolVar(&help, "help", false, "show help information")
+
 	flagSet.StringVar(&opts.LogLevel, "log-level", opts.LogLevel, "set log verbosity: debug, info, warn, error, or fatal")
 	flagSet.StringVar(&opts.LogPrefix, "log-prefix", opts.LogPrefix, "log message prefix")
 
