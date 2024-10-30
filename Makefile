@@ -2,7 +2,7 @@ PREFIX=/usr/local
 BINDIR=${PREFIX}/bin
 DESTDIR=
 BLDDIR = build
-#BLDFLAGS = CGO_ENABLED=0 GOOS=linux GOARCH=x64
+#BLDFLAGS = CGO_ENABLED=0 GOOS=linux GOARCH=amd64 #golang的交叉编译秒啊
 EXT=
 ifeq (${GOOS},windows)
     EXT=.exe
@@ -17,7 +17,7 @@ $(BLDDIR)/kafka-consumer: $(wildcard apps/kafka-consumer/*.go cache/*.go lg/*.go
 
 $(BLDDIR)/%:
 	@mkdir -p $(dir $@)
-	${BBLDFLAGS} go build -o $@ ./apps/$*
+	${BLDFLAGS} go build -o $@ ./apps/$*
 
 $(APPS): %: $(BLDDIR)/%
 
