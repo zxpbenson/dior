@@ -2,7 +2,34 @@ PREFIX=/usr/local
 BINDIR=${PREFIX}/bin
 DESTDIR=
 BLDDIR = build
-#BLDFLAGS = CGO_ENABLED=0 GOOS=linux GOARCH=amd64 #golang的交叉编译秒啊
+
+# GOOS 的可选项包括：
+# darwin：macOS
+# linux：Linux
+# windows：Windows
+# freebsd：FreeBSD
+# netbsd：NetBSD
+# openbsd：OpenBSD
+# dragonfly：DragonFly BSD
+# android：Android
+# ios：iOS
+# js：JavaScript（用于 WebAssembly）
+
+# GOARCH 的可选项包括：
+# amd64：64 位 x86 架构
+# 386：32 位 x86 架构
+# arm：32 位 ARM 架构
+# arm64：64 位 ARM 架构（也称为 AArch64）
+# mips：32 位 MIPS 架构
+# mipsle：32 位小端 MIPS 架构
+# mips64：64 位 MIPS 架构
+# mips64le：64 位小端 MIPS 架构
+# ppc：32 位 PowerPC 架构
+# ppc64：64 位 PowerPC 架构
+# ppc64le：64 位小端 PowerPC 架构
+# s390x：64 位 IBM Z 架构
+
+BLDFLAGS = CGO_ENABLED=0 GOOS=linux GOARCH=arm64 #golang的交叉编译妙啊
 EXT=
 ifeq (${GOOS},windows)
     EXT=.exe
