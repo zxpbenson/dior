@@ -25,7 +25,7 @@ func init() {
 func newPressSource(opts *option.Options) (component.Component, error) {
 	return &PressSource{
 		Asynchronizer: &component.Asynchronizer{},
-		cache:         cache.NewCache(),
+		cache:         cache.NewCache(opts.SrcScannerBufSizeMb),
 		dataFile:      opts.SrcFile,
 		writeDone:     make(chan int64),
 		writeCmd:      make(chan int64, 10),

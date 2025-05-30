@@ -10,12 +10,13 @@ type Ticket struct {
 }
 
 type Cache struct {
-	data [][]byte
-	size uint32
+	data      [][]byte
+	size      uint32
+	bufSizeMb int
 }
 
-func NewCache() *Cache {
-	return &Cache{size: 0}
+func NewCache(bufSizeMb int) *Cache {
+	return &Cache{size: 0, bufSizeMb: bufSizeMb}
 }
 
 func NewTicket() *Ticket {
@@ -42,6 +43,9 @@ func (cache *Cache) Load(path string) error {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file) //scan the contents of a file and print line by line
+	// 设置 buffer 上限为 10MB
+	buf := make([]byte, 0, 1024*1024) // 初始 buffer 为 1MB
+	scanner.Buffer(buf, cache.bufSizeMb*1024*1024)
 
 	for scanner.Scan() {
 		line := scanner.Text()

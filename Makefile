@@ -29,7 +29,7 @@ BLDDIR = build
 # ppc64le：64 位小端 PowerPC 架构
 # s390x：64 位 IBM Z 架构
 
-BLDFLAGS = CGO_ENABLED=0 GOOS=linux GOARCH=arm64 #golang的交叉编译妙啊
+BLDFLAGS = CGO_ENABLED=0 GOOS=linux GOARCH=amd64 #golang的交叉编译妙啊
 EXT=
 ifeq (${GOOS},windows)
     EXT=.exe

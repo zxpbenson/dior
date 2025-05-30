@@ -21,6 +21,7 @@ type Options struct {
 	SrcGroup               string   `flag:"src-group"`
 	SrcSpeed               int64    `flag:"src-speed"`
 	SrcFile                string   `flag:"src-file"`
+	SrcScannerBufSizeMb    int      `flag:"src-scanner-buf-size-mb"`
 
 	ChanSize int `flag:"chan-size"`
 
@@ -48,6 +49,7 @@ func NewOptions(app string) *Options {
 		SrcNSQDTCPAddresses:    make([]string, 0),
 		SrcBootstrapServers:    make([]string, 0),
 		SrcSpeed:               10,
+		SrcScannerBufSizeMb:    1,
 
 		ChanSize: 100,
 
@@ -101,6 +103,7 @@ func FlagSet(opts *Options) *flag.FlagSet {
 
 	flagSet.Int64Var(&opts.SrcSpeed, "src-speed", opts.SrcSpeed, "speed of data writing per seconds, >= 0, 0 means as fast as possible，default 10")
 	flagSet.StringVar(&opts.SrcFile, "src-file", opts.SrcFile, "path of file to read data for source")
+	flagSet.IntVar(&opts.SrcScannerBufSizeMb, "src-scanner-buf-size-mb", opts.SrcScannerBufSizeMb, "the buffer size of source file scanner, parameter value is in MB")
 
 	flagSet.IntVar(&opts.ChanSize, "chan-size", opts.ChanSize, "size of queue between source and sink, >= 0, 0 means non blocking queue")
 
