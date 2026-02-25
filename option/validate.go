@@ -83,7 +83,7 @@ func (this *Options) validateSrcPress() error {
 			if os.IsNotExist(err) {
 				return errors.New("SrcFile not exists : " + this.SrcFile)
 			}
-			return errors.Join(err, errors.New("SrcFile access error : "+this.DstFile))
+			return errors.Join(err, errors.New("SrcFile access error : "+this.SrcFile))
 		}
 		if fileInfo.IsDir() {
 			return errors.New("SrcFile It`s a directory : " + this.SrcFile)

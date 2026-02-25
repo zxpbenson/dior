@@ -79,12 +79,10 @@ func (this *KafkaSource) Start() {
 				}
 				lg.DftLgr.Error("KafkaSource.Start nameless routine Error from consumer: %v", err)
 			}
-			// check if context w
-			//as cancelled, signaling that the consumer should stop
+			// check if context was cancelled, signaling that the consumer should stop
 			if this.ctx.Err() != nil {
 				return
 			}
-			this.consumer.Prepare(this.consume)
 		}
 	}()
 
