@@ -7,6 +7,8 @@ import (
 	"dior/internal/lg"
 	"dior/option"
 	"errors"
+	"time"
+
 	"github.com/IBM/sarama"
 )
 
@@ -40,8 +42,6 @@ func newKafkaSource(opts *option.Options) (component.Component, error) {
 func (s *KafkaSource) Init(channel chan []byte) (err error) {
 	s.Asynchronizer.Init(channel)
 
-	s.consumer.Prepare(s.consume)
-
 	version, err := sarama.ParseKafkaVersion("2.1.1")
 	if err != nil {
 		lg.DftLgr.Error("Error parsing Kafka version: %v", err)
@@ -67,8 +67,10 @@ func (s *KafkaSource) Start(ctx context.Context) {
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
 	s.Add(1)
+	s.consumer.Prepare(s.consume)
 	go func() {
 		defer s.Done()
+		backoff := time.Second
 		for {
 			// `Consume` should be called inside an infinite loop, when a
 			// server-side rebalance happens, the consumer session will need to be
@@ -77,12 +79,25 @@ func (s *KafkaSource) Start(ctx context.Context) {
 				if errors.Is(err, sarama.ErrClosedConsumerGroup) {
 					return
 				}
-				lg.DftLgr.Error("KafkaSource.Start nameless routine Error from consumer: %v", err)
+				lg.DftLgr.Error("KafkaSource.Start nameless routine Error from consumer: %v, will retry after %v", err, backoff)
+				
+				select {
+				case <-s.ctx.Done():
+					return
+				case <-time.After(backoff):
+				}
+
+				backoff *= 2
+				if backoff > 10*time.Second {
+					backoff = 10 * time.Second
+				}
+			} else {
+				backoff = time.Second
 			}
-			// check if context was cancelled, signaling that the consumer should stop
 			if s.ctx.Err() != nil {
 				return
 			}
+			s.consumer.ResetReady()
 		}
 	}()
 

@@ -20,6 +20,10 @@ func (c *Consumer) Prepare(fun ConsumeFunc) {
 	c.ready = make(chan bool)
 }
 
+func (c *Consumer) ResetReady() {
+	c.ready = make(chan bool)
+}
+
 func (c *Consumer) WaitReady(ctx context.Context) {
 	select {
 	case <-c.ready:
