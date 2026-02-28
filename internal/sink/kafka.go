@@ -1,8 +1,9 @@
 package sink
 
 import (
+	"context"
 	"dior/component"
-	"dior/lg"
+	"dior/internal/lg"
 	"dior/option"
 	"github.com/IBM/sarama"
 )
@@ -27,8 +28,8 @@ func newkafkaSink(opts *option.Options) (component.Component, error) {
 	}, nil
 }
 
-func (this *kafkaSink) Init() (err error) {
-	this.Asynchronizer.Init()
+func (s *kafkaSink) Init(channel chan []byte) (err error) {
+	s.Asynchronizer.Init(channel)
 
 	config := sarama.NewConfig()
 	config.Producer.RequiredAcks = sarama.WaitForAll          // 发送完数据需要leader和follower都确认
@@ -36,30 +37,33 @@ func (this *kafkaSink) Init() (err error) {
 	config.Producer.Return.Successes = true                   // 成功交付的消息将在success channel返回
 
 	// 连接kafka
-	this.producer, err = sarama.NewSyncProducer(this.kafkaBootstrapServers, config)
+	s.producer, err = sarama.NewSyncProducer(s.kafkaBootstrapServers, config)
 	if err != nil {
-		//lg.DftLgr.Error("kafkaSink init err : %v", err)
 		return err
 	}
 
-	this.Output = this.produce
+	s.Output = s.produce
 	return nil
 }
 
-func (this *kafkaSink) Stop() {
-	this.Asynchronizer.Stop()
-	this.producer.Close()
+func (s *kafkaSink) Start(ctx context.Context) {
+	s.Asynchronizer.Start(ctx)
+}
+
+func (s *kafkaSink) Stop() {
+	s.Asynchronizer.Stop()
+	s.producer.Close()
 	lg.DftLgr.Info("kafkaSink.Stop done.")
 }
 
-func (this *kafkaSink) produce(data []byte) {
+func (s *kafkaSink) produce(data []byte) {
 	// 构造一个消息
 	msg := &sarama.ProducerMessage{}
-	msg.Topic = this.topic
+	msg.Topic = s.topic
 	msg.Value = sarama.ByteEncoder(data)
 
 	// 发送消息
-	partitionId, offset, err := this.producer.SendMessage(msg)
+	partitionId, offset, err := s.producer.SendMessage(msg)
 	if err != nil {
 		lg.DftLgr.Error("kafkaSink.produce send msg failed, err : %v", err)
 		return

@@ -38,21 +38,24 @@ endif
 APPS = dior some kafka-consumer
 all: $(APPS)
 
-$(BLDDIR)/dior:           $(wildcard apps/dior/*.go cache/*.go lg/*.go option/*.go pressor/*.go writer/*.go)
-$(BLDDIR)/some:           $(wildcard apps/some/*.go cache/*.go lg/*.go option/*.go pressor/*.go writer/*.go)
-$(BLDDIR)/kafka-consumer: $(wildcard apps/kafka-consumer/*.go cache/*.go lg/*.go option/*.go pressor/*.go writer/*.go)
+$(BLDDIR)/dior:           $(wildcard cmd/dior/*.go internal/cache/*.go internal/lg/*.go option/*.go internal/source/*.go internal/sink/*.go component/*.go internal/version/*.go internal/kafka/*.go)
+$(BLDDIR)/some:           $(wildcard cmd/some/*.go internal/cache/*.go internal/lg/*.go option/*.go internal/source/*.go internal/sink/*.go component/*.go internal/version/*.go internal/kafka/*.go)
+$(BLDDIR)/kafka-consumer: $(wildcard cmd/kafka-consumer/*.go internal/cache/*.go internal/lg/*.go option/*.go internal/source/*.go internal/sink/*.go component/*.go internal/version/*.go internal/kafka/*.go)
 
 $(BLDDIR)/%:
 	@mkdir -p $(dir $@)
-	${BLDFLAGS} go build -o $@ ./apps/$*
+	${BLDFLAGS} go build -o $@ ./cmd/$*
 
 $(APPS): %: $(BLDDIR)/%
 
 clean:
 	rm -fr $(BLDDIR)
 
-.PHONY: install clean all
+.PHONY: install clean all test
 .PHONY: $(APPS)
+
+test:
+	go test -v -race -cover ./...
 
 install: $(APPS)
 	install -m 755 -d ${DESTDIR}${BINDIR}

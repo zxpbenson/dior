@@ -2,11 +2,11 @@ package main
 
 import (
 	"dior/component"
-	"dior/lg"
+	"dior/internal/lg"
+	_ "dior/internal/sink"
+	_ "dior/internal/source"
+	"dior/internal/version"
 	"dior/option"
-	_ "dior/sink"
-	_ "dior/source"
-	"dior/version"
 	"flag"
 	"fmt"
 	"os"
@@ -16,10 +16,13 @@ func main() {
 	opts := option.NewOptions("dior")
 
 	flagSet := option.FlagSet(opts)
+	flagSet.Usage = func() {
+		fmt.Println(usage())
+		flagSet.PrintDefaults()
+	}
 	flagSet.Parse(os.Args[1:])
 
-	if flagSet.Lookup("help").Value.(flag.Getter).Get().(bool) || len(os.Args) == 1 {
-		fmt.Println(usage())
+	if len(os.Args) == 1 {
 		flagSet.Usage()
 		os.Exit(0)
 	}
@@ -29,9 +32,9 @@ func main() {
 		os.Exit(0)
 	}
 
-	json, _ := opts.Json()
+	jsonBytes, _ := opts.Json()
 	if err := opts.Validate(); err != nil {
-		fmt.Printf("config : %s\nparam error : %v\n", json, err)
+		fmt.Printf("config : %s\nparam error : %v\n", jsonBytes, err)
 		os.Exit(1)
 	}
 
@@ -40,11 +43,17 @@ func main() {
 		fmt.Printf("main.go goroutine logger create error : %v\n", err)
 		os.Exit(1)
 	}
-	lg.DftLgr.Info("options : %s\n", json)
+	lg.DftLgr.Info("options : %s\n", jsonBytes)
 
 	controller := component.NewController()
-	controller.AddComponents(opts)
-	controller.Init()
+	if err := controller.AddComponents(opts); err != nil {
+		fmt.Printf("Controller.AddComponents error : %v\n", err)
+		os.Exit(1)
+	}
+	if err := controller.Init(); err != nil {
+		fmt.Printf("Controller.Init error : %v\n", err)
+		os.Exit(1)
+	}
 	controller.Start()
 
 	lg.DftLgr.Info("Main goroutine done, bye.\n")
@@ -68,7 +77,6 @@ func usage() (usage string) {
 		"\n" +
 		"\nSupported transport cases : " +
 		"\n" +
-		"\n  * press nsq" +
 		"\n  * kafka to kafka" +
 		"\n  * kafka to nsq" +
 		"\n  * kafka to file" +

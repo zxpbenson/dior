@@ -1,8 +1,9 @@
 package sink
 
 import (
+	"context"
 	"dior/component"
-	"dior/lg"
+	"dior/internal/lg"
 	"dior/option"
 )
 
@@ -20,12 +21,21 @@ func newNilSink(opts *option.Options) (component.Component, error) {
 	}, nil
 }
 
-func (this *nilSink) Init() (err error) {
-	this.Asynchronizer.Init()
-	this.Output = this.output
+func (s *nilSink) Init(channel chan []byte) (err error) {
+	s.Asynchronizer.Init(channel)
+	s.Output = s.output
 	return nil
 }
 
-func (this *nilSink) output(data []byte) {
+func (s *nilSink) Start(ctx context.Context) {
+	s.Asynchronizer.Start(ctx)
+}
+
+func (s *nilSink) Stop() {
+	s.Asynchronizer.Stop()
+	lg.DftLgr.Info("NilSink.Stop done.")
+}
+
+func (s *nilSink) output(data []byte) {
 	lg.DftLgr.Debug("NilSink.output data : %v", data)
 }

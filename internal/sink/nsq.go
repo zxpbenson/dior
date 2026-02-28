@@ -1,8 +1,9 @@
 package sink
 
 import (
+	"context"
 	"dior/component"
-	"dior/lg"
+	"dior/internal/lg"
 	"dior/option"
 	"github.com/nsqio/go-nsq"
 )
@@ -31,31 +32,34 @@ func newNSQSink(opts *option.Options) (component.Component, error) {
 	}, nil
 }
 
-func (this *nsqSink) Init() (err error) {
-	this.Asynchronizer.Init()
+func (s *nsqSink) Init(channel chan []byte) (err error) {
+	s.Asynchronizer.Init(channel)
 
 	cfg := nsq.NewConfig()
-	this.nsqdLen = len(this.nsqdTCPAddresses)
-	this.producers = make([]*nsq.Producer, this.nsqdLen)
-	for idx, nsqdTCPAddress := range this.nsqdTCPAddresses {
-		this.producers[idx], err = nsq.NewProducer(nsqdTCPAddress, cfg)
+	s.nsqdLen = len(s.nsqdTCPAddresses)
+	s.producers = make([]*nsq.Producer, s.nsqdLen)
+	for idx, nsqdTCPAddress := range s.nsqdTCPAddresses {
+		s.producers[idx], err = nsq.NewProducer(nsqdTCPAddress, cfg)
 		if err != nil {
-			lg.DftLgr.Error("nsqSink.Init Producer open err: %v", err)
 			return err
 		}
 	}
-	this.Output = this.output
+	s.Output = s.output
 	return nil
 }
 
-func (this *nsqSink) output(data []byte) {
-	this.producers[this.nsqdIndex].Publish(this.topic, data)
-	this.nsqdIndex = (this.nsqdIndex + 1) % this.nsqdLen
+func (s *nsqSink) output(data []byte) {
+	s.producers[s.nsqdIndex].Publish(s.topic, data)
+	s.nsqdIndex = (s.nsqdIndex + 1) % s.nsqdLen
 }
 
-func (this *nsqSink) Stop() {
-	this.Asynchronizer.Stop()
-	for _, producer := range this.producers {
+func (s *nsqSink) Start(ctx context.Context) {
+	s.Asynchronizer.Start(ctx)
+}
+
+func (s *nsqSink) Stop() {
+	s.Asynchronizer.Stop()
+	for _, producer := range s.producers {
 		producer.Stop()
 	}
 	lg.DftLgr.Info("nsqSink.Stop done.")

@@ -23,13 +23,13 @@ func NewTicket() *Ticket {
 	return &Ticket{index: 0}
 }
 
-func (ticket *Ticket) Index(max uint32) (index uint32) {
+func (ticket *Ticket) acquire(max uint32) (index uint32) {
 	index = ticket.index
 	if index == max-1 {
-		ticket.index = 0
-		return
+		ticket.index = 0 // 为下一次准备，回卷到 0
+		return           // 当前这一次还是返回原来的 index (即 max-1)
 	}
-	ticket.index += 1
+	ticket.index += 1 // 否则正常 +1
 	return
 }
 
@@ -56,13 +56,10 @@ func (cache *Cache) Load(path string) error {
 		cache.size++
 	}
 	err = scanner.Err()
-	if err != nil {
-		//fmt.Println("Error reading from file:", err) //print error if scanning is not done properly
-	}
-
 	return err
 }
+
 func (cache *Cache) Next(ticket *Ticket) []byte {
-	index := ticket.Index(cache.size)
+	index := ticket.acquire(cache.size)
 	return cache.data[index]
 }

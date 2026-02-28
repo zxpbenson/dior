@@ -1,9 +1,9 @@
 package kafka
 
 import (
-	"dior/lg"
+	"context"
+	"dior/internal/lg"
 	"github.com/IBM/sarama"
-	"log"
 )
 
 type ConsumeFunc func(msg *sarama.ConsumerMessage)
@@ -15,25 +15,29 @@ type Consumer struct {
 	consume ConsumeFunc
 }
 
-func (this *Consumer) Prepare(fun ConsumeFunc) {
-	this.consume = fun
-	this.ready = make(chan bool)
+func (c *Consumer) Prepare(fun ConsumeFunc) {
+	c.consume = fun
+	c.ready = make(chan bool)
 }
 
-func (this *Consumer) WaitReady() {
-	<-this.ready
+func (c *Consumer) WaitReady(ctx context.Context) {
+	select {
+	case <-c.ready:
+	case <-ctx.Done():
+		lg.DftLgr.Warn("Consumer.WaitReady aborted by context")
+	}
 }
 
 // Setup is run at the beginning of a new session, before ConsumeClaim
-func (this *Consumer) Setup(sarama.ConsumerGroupSession) error {
+func (c *Consumer) Setup(sarama.ConsumerGroupSession) error {
 	// Mark the consumer as ready
-	close(this.ready)
+	close(c.ready)
 	lg.DftLgr.Warn("Consumer.Setup done.")
 	return nil
 }
 
 // Cleanup is run at the end of a session, once all ConsumeClaim goroutines have exited
-func (this *Consumer) Cleanup(sarama.ConsumerGroupSession) error {
+func (c *Consumer) Cleanup(sarama.ConsumerGroupSession) error {
 	lg.DftLgr.Warn("Consumer.Cleanup done.")
 	return nil
 }
@@ -41,7 +45,7 @@ func (this *Consumer) Cleanup(sarama.ConsumerGroupSession) error {
 // ConsumeClaim must start a consumer loop of ConsumerGroupClaim's Messages().
 // Once the Messages() channel is closed, the Handler must finish its processing
 // loop and exit.
-func (this *Consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+func (c *Consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	// NOTE:
 	// Do not move the code below to a goroutine.
 	// The `ConsumeClaim` itself is called within a goroutine, see:
@@ -50,13 +54,13 @@ func (this *Consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sa
 		select {
 		case message, ok := <-claim.Messages():
 			if !ok {
-				log.Printf("message channel was closed")
+				lg.DftLgr.Warn("message channel was closed")
 				return nil
 			}
 			if lg.DftLgr.Enable(lg.DEBUG) {
 				lg.DftLgr.Debug("Consumer.ConsumeClaim Message claimed: value = %s, timestamp = %v, topic = %s", string(message.Value), message.Timestamp, message.Topic)
 			}
-			this.consume(message)
+			c.consume(message)
 
 			session.MarkMessage(message, "")
 		// Should return when `session.Context()` is done.

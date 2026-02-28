@@ -34,8 +34,8 @@ type Options struct {
 	DstBufSizeByte         int      `flag:"dst-buf-size-byte"`
 }
 
-func (this *Options) Json() ([]byte, error) {
-	return json.Marshal(this)
+func (o *Options) Json() ([]byte, error) {
+	return json.Marshal(o)
 }
 
 func NewOptions(app string) *Options {
@@ -65,9 +65,8 @@ func NewOptions(app string) *Options {
 func FlagSet(opts *Options) *flag.FlagSet {
 	flagSet := flag.NewFlagSet(opts.app, flag.ExitOnError)
 
-	version, help := false, false
+	version := false
 	flagSet.BoolVar(&version, "version", false, "show dior version")
-	flagSet.BoolVar(&help, "help", false, "show help information")
 
 	flagSet.StringVar(&opts.LogLevel, "log-level", opts.LogLevel, "set log verbosity: debug, info, warn, error, or fatal")
 	flagSet.StringVar(&opts.LogPrefix, "log-prefix", opts.LogPrefix, "log message prefix")
@@ -107,7 +106,7 @@ func FlagSet(opts *Options) *flag.FlagSet {
 
 	flagSet.IntVar(&opts.ChanSize, "chan-size", opts.ChanSize, "size of queue between source and sink, >= 0, 0 means non blocking queue")
 
-	flagSet.StringVar(&opts.Dst, "dst", opts.Dst, "destination type, options : nsq, kafka")
+	flagSet.StringVar(&opts.Dst, "dst", opts.Dst, "destination type, options : nsq, kafka, file, nil")
 
 	flagSet.StringVar(&opts.DstTopic, "dst-topic", opts.DstTopic, "destination topic of nsq or kafka")
 
@@ -132,7 +131,7 @@ func FlagSet(opts *Options) *flag.FlagSet {
 		opts.DstBootstrapServers = strings.Split(s, ",")
 		return nil
 	})
-	flagSet.StringVar(&opts.DstFile, "dst-file", opts.SrcFile, "path of file to write data for sink")
+	flagSet.StringVar(&opts.DstFile, "dst-file", opts.DstFile, "path of file to write data for sink")
 	flagSet.IntVar(&opts.DstBufSizeByte, "dst-buf-size-byte", opts.DstBufSizeByte, "buf size of sink writer, >= 0, default 4096")
 	return flagSet
 }

@@ -1,8 +1,10 @@
 package component
 
 import (
-	"dior/lg"
+	"context"
+	"dior/internal/lg"
 	"dior/option"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -17,70 +19,82 @@ type Controller struct {
 	source  Component
 	sink    Component
 	sysSig  chan os.Signal
-	control *sync.WaitGroup
+	srcWG   *sync.WaitGroup
+	sinkWG  *sync.WaitGroup
+	channel chan []byte
 }
 
 func NewController() *Controller {
 	return &Controller{
-		control: &sync.WaitGroup{},
-		sysSig:  make(chan os.Signal, 1),
+		srcWG:  &sync.WaitGroup{},
+		sinkWG: &sync.WaitGroup{},
+		sysSig: make(chan os.Signal, 1),
 	}
 }
 
-func (this *Controller) AddComponents(opts *option.Options) {
+func (c *Controller) AddComponents(opts *option.Options) error {
 	source, err := NewComponent(opts.Src+"-source", opts)
 	if err != nil {
-		lg.DftLgr.Fatal("Controller.AddComponents create source fail : %v", err)
+		return fmt.Errorf("Controller.AddComponents create source fail : %w", err)
 	}
 	sink, err := NewComponent(opts.Dst+"-sink", opts)
 	if err != nil {
-		lg.DftLgr.Fatal("Controller.AddComponents create sink fail : %v", err)
+		return fmt.Errorf("Controller.AddComponents create sink fail : %w", err)
 	}
 	channel := make(chan []byte, opts.ChanSize)
-	this.AddIO(source, channel, sink)
+	c.addIO(source, channel, sink)
+	return nil
 }
 
-func (this *Controller) AddIO(source Component, channel chan []byte, sink Component) {
-	this.source = source
-	this.sink = sink
-	source.SetChannel(channel)
-	sink.SetChannel(channel)
-	source.UnderControl(this.control)
-	sink.UnderControl(this.control)
+func (c *Controller) addIO(source Component, channel chan []byte, sink Component) {
+	c.source = source
+	c.sink = sink
+	c.channel = channel
+	source.UnderControl(c.srcWG)
+	sink.UnderControl(c.sinkWG)
 }
 
-func (this *Controller) Init() {
-	err := this.sink.Init()
-	if err != nil {
-		lg.DftLgr.Fatal("Controller init sink fail : %v", err)
+func (c *Controller) Init() error {
+	if err := c.sink.Init(c.channel); err != nil {
+		return fmt.Errorf("Controller init sink fail : %w", err)
 	}
 
-	err = this.source.Init()
-	if err != nil {
-		lg.DftLgr.Fatal("Controller init source fail : %v", err)
+	if err := c.source.Init(c.channel); err != nil {
+		return fmt.Errorf("Controller init source fail : %w", err)
 	}
+	return nil
 }
 
-func (this *Controller) Start() {
+func (c *Controller) Start() {
+	ctx, cancel := context.WithCancel(context.Background())
+	//defer cancel() // 重复
 
-	this.sink.Start()
-	this.source.Start()
+	c.sink.Start(ctx)
+	c.source.Start(ctx)
 
-	signal.Notify(this.sysSig, os.Interrupt, syscall.SIGINT, syscall.SIGQUIT)
+	signal.Notify(c.sysSig, os.Interrupt, syscall.SIGINT, syscall.SIGQUIT)
 
-CONTROL:
-	for {
-		select {
-		case sig := <-this.sysSig:
-			lg.DftLgr.Warn("Controller receive signal from system : %v", sig)
-			signal.Stop(this.sysSig)
-			this.sink.Stop()
-			this.source.Stop()
-			break CONTROL
-		}
+	select {
+	case sig := <-c.sysSig:
+		lg.DftLgr.Warn("Controller receive signal from system : %v", sig)
+		signal.Stop(c.sysSig)
+		
+		// 1. 通知并强制关闭 Source
+		cancel()        // 通过 ctx 取消通知 Source
+		c.source.Stop() // 显式调用 Stop (某些组件如 NSQ 依赖此方法阻塞等待结束)
 	}
 
-	lg.DftLgr.Warn("Controller wait for source / sink close done...")
-	this.control.Wait()
-	lg.DftLgr.Warn("Controller has closed all source / sink.")
+	lg.DftLgr.Warn("Controller wait for source close done...")
+	c.srcWG.Wait()
+
+	// 2. Source 已完全停止，不会再产生数据，此时安全关闭 Channel
+	close(c.channel)
+	lg.DftLgr.Warn("Controller closed data channel.")
+
+	// 3. 通知 Sink 准备结束，并等待其排空 Channel 中的剩余数据
+	lg.DftLgr.Warn("Controller wait for sink close done...")
+	c.sink.Stop()
+	c.sinkWG.Wait()
+
+	lg.DftLgr.Warn("Controller has safely closed all source / sink.")
 }

@@ -1,6 +1,7 @@
 package component
 
 import (
+	"context"
 	"dior/option"
 	"errors"
 	"strings"
@@ -8,11 +9,9 @@ import (
 
 type Component interface {
 	Controllable
-	Init() (err error)
-	Start()
+	Init(channel chan []byte) (err error)
+	Start(ctx context.Context)
 	Stop()
-	SetChannel(chan []byte)
-	WaitEmpty()
 }
 
 type OutputFunc func(data []byte)

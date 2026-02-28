@@ -19,11 +19,11 @@ func init() {
 type A struct {
 }
 
-func (this *A) F1() {
+func (a *A) F1() {
 	fmt.Println("AAA f1")
 }
 
-func (this *A) F2() {
+func (a *A) F2() {
 	fmt.Println("AAA f2")
 }
 
@@ -31,7 +31,7 @@ type B struct {
 	A
 }
 
-func (this *B) F2() {
+func (b *B) F2() {
 	fmt.Println("BBB f2")
 }
 
