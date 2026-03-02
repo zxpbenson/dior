@@ -29,9 +29,9 @@ func init() {
 	component.RegCmpCreator("kafka-source", newKafkaSource)
 }
 
-func newKafkaSource(opts *option.Options) (component.Component, error) {
+func newKafkaSource(name string, opts *option.Options) (component.Component, error) {
 	return &KafkaSource{
-		Asynchronizer:         component.NewAsynchronizer(),
+		Asynchronizer:         component.NewAsynchronizer(name),
 		consumer:              &kafka.Consumer{},
 		kafkaBootstrapServers: opts.SrcBootstrapServers,
 		topic:                 opts.SrcTopic,
@@ -69,12 +69,14 @@ func (s *KafkaSource) Start(ctx context.Context) {
 	ctx, s.cancel = context.WithCancel(ctx)
 
 	s.Add(1)
+	s.Asynchronizer.SetState(component.CompStateRunning)
 	s.consumer.Prepare(s.consume)
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
 				lg.DftLgr.Error("KafkaSource.Start panic recovered: %v", err)
 			}
+			s.Asynchronizer.SetState(component.CompStateStopped)
 			s.Done()
 			lg.DftLgr.Info("KafkaSource.Start goroutine exited")
 		}()
@@ -138,6 +140,7 @@ func (s *KafkaSource) Stop() {
 	if err := s.client.Close(); err != nil {
 		lg.DftLgr.Warn("KafkaSource.Stop Error closing client: %v", err)
 	}
+	s.Asynchronizer.Stop()
 	lg.DftLgr.Info("KafkaSource.Stop done.")
 }
 

@@ -24,9 +24,9 @@ func init() {
 	component.RegCmpCreator("press-source", newPressSource)
 }
 
-func newPressSource(opts *option.Options) (component.Component, error) {
+func newPressSource(name string, opts *option.Options) (component.Component, error) {
 	return &PressSource{
-		Asynchronizer: component.NewAsynchronizer(),
+		Asynchronizer: component.NewAsynchronizer(name),
 		cache:         cache.NewCache(opts.SrcScannerBufSizeMb),
 		dataFile:      opts.SrcFile,
 		writeDone:     make(chan int64),
@@ -48,11 +48,14 @@ func (s *PressSource) Start(ctx context.Context) {
 
 func (s *PressSource) doCmd(ctx context.Context) {
 	s.Add(1)
+	s.Asynchronizer.SetState(component.CompStateRunning)
 	defer func() {
 		if err := recover(); err != nil {
 			lg.DftLgr.Error("PressSource.doCmd recover error : %v", err)
 		}
+		s.Asynchronizer.SetState(component.CompStateStopped)
 		s.Done()
+		s.Asynchronizer.ShowStats()
 	}()
 
 	ticker := time.NewTicker(time.Second)
@@ -144,7 +147,6 @@ func (s *PressSource) writeLoop(ctx context.Context, limit int64, ticket *cache.
 }
 
 func (s *PressSource) Stop() {
-	// PressSource的goroutine通过ctx.Done()退出
-	// 这里不需要额外操作，但保留方法以便将来扩展
+	s.Asynchronizer.Stop()
 	lg.DftLgr.Info("PressSource.Stop called, goroutines will exit via context cancellation")
 }

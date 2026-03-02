@@ -21,9 +21,9 @@ func init() {
 	component.RegCmpCreator("kafka-sink", newkafkaSink)
 }
 
-func newkafkaSink(opts *option.Options) (component.Component, error) {
+func newkafkaSink(name string, opts *option.Options) (component.Component, error) {
 	return &kafkaSink{
-		Asynchronizer:         component.NewAsynchronizer(),
+		Asynchronizer:         component.NewAsynchronizer(name),
 		kafkaBootstrapServers: opts.DstBootstrapServers,
 		topic:                 opts.DstTopic,
 	}, nil
@@ -45,16 +45,6 @@ func (s *kafkaSink) Init(channel chan []byte) (err error) {
 
 	s.Output = s.produce
 	return nil
-}
-
-func (s *kafkaSink) Start(ctx context.Context) {
-	s.Asynchronizer.Start(ctx)
-}
-
-func (s *kafkaSink) Stop() {
-	s.Asynchronizer.Stop()
-	s.producer.Close()
-	lg.DftLgr.Info("kafkaSink.Stop done.")
 }
 
 func (s *kafkaSink) produce(data []byte) {
@@ -85,4 +75,14 @@ func (s *kafkaSink) produce(data []byte) {
 
 	// 所有重试都失败
 	lg.DftLgr.Error("kafkaSink.produce send msg failed after %d attempts, last error: %v", maxRetries, lastErr)
+}
+
+func (s *kafkaSink) Start(ctx context.Context) {
+	s.Asynchronizer.Start(ctx)
+}
+
+func (s *kafkaSink) Stop() {
+	s.producer.Close()
+	s.Asynchronizer.Stop()
+	lg.DftLgr.Info("kafkaSink.Stop done.")
 }

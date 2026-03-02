@@ -4,6 +4,8 @@ import (
 	"context"
 	"dior/option"
 	"errors"
+	"fmt"
+	"os"
 	"strings"
 )
 
@@ -16,17 +18,17 @@ type Component interface {
 
 type OutputFunc func(data []byte)
 
-type ComponentCreator func(options *option.Options) (Component, error)
+type ComponentCreator func(name string, options *option.Options) (Component, error)
 
 var cmpCreatorMap map[string]ComponentCreator = make(map[string]ComponentCreator)
 
-func RegCmpCreator(name string, creator ComponentCreator) error {
+func RegCmpCreator(name string, creator ComponentCreator) {
 	name = strings.ToLower(name)
 	if oldCreator := cmpCreatorMap[name]; oldCreator != nil {
-		return errors.New("conflict type : " + name)
+		fmt.Printf("conflict type : " + name)
+		os.Exit(1) // 这种错误只能开发阶段处理，有错误直接退出
 	}
 	cmpCreatorMap[name] = creator
-	return nil
 }
 
 func NewComponent(name string, opts *option.Options) (Component, error) {
@@ -35,5 +37,5 @@ func NewComponent(name string, opts *option.Options) (Component, error) {
 	if creator == nil {
 		return nil, errors.New("unsupported type : " + name)
 	}
-	return creator(opts)
+	return creator(name, opts)
 }

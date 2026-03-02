@@ -25,9 +25,9 @@ func init() {
 	component.RegCmpCreator("file-sink", newFileSink)
 }
 
-func newFileSink(opts *option.Options) (component.Component, error) {
+func newFileSink(name string, opts *option.Options) (component.Component, error) {
 	return &fileSink{
-		Asynchronizer: component.NewAsynchronizer(),
+		Asynchronizer: component.NewAsynchronizer(name),
 		fileName:      opts.DstFile,
 		splitter:      []byte("\n"),
 		bufSize:       opts.DstBufSizeByte,
@@ -47,7 +47,9 @@ func (s *fileSink) Init(channel chan []byte) (err error) {
 }
 
 func (s *fileSink) output(data []byte) {
-	lg.DftLgr.Debug("FileSink.output data: %v", data)
+	if lg.DftLgr.Enable(lg.DEBUG) {
+		lg.DftLgr.Debug("FileSink.output data: %v", string(data))
+	}
 
 	// 写入数据
 	n, err := s.writer.Write(data)

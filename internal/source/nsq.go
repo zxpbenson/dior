@@ -23,9 +23,9 @@ func init() {
 	component.RegCmpCreator("nsq-source", newNSQSource)
 }
 
-func newNSQSource(opts *option.Options) (component.Component, error) {
+func newNSQSource(name string, opts *option.Options) (component.Component, error) {
 	return &NSQSource{
-		Asynchronizer: component.NewAsynchronizer(),
+		Asynchronizer: component.NewAsynchronizer(name),
 		nsqds:         opts.SrcNSQDTCPAddresses,
 		nsqLookupds:   opts.SrcLookupdTCPAddresses,
 		topic:         opts.SrcTopic,
@@ -42,6 +42,20 @@ func (s *NSQSource) Init(channel chan []byte) (err error) {
 	}
 	s.consumer.AddHandler(nsq.HandlerFunc(s.handlerFunc))
 	return nil
+}
+
+func (s *NSQSource) handlerFunc(message *nsq.Message) error {
+	// 使用select防止channel满时阻塞
+	select {
+	case s.Channel <- message.Body:
+		// 发送成功
+		return nil
+	default:
+		// channel已满，记录警告并重试
+		lg.DftLgr.Warn("NSQSource.handlerFunc channel full, message will be requeued")
+		// 返回错误让NSQ重新入队
+		return fmt.Errorf("channel full, requeue message")
+	}
 }
 
 func (s *NSQSource) Start(ctx context.Context) {
@@ -66,21 +80,6 @@ func (s *NSQSource) Start(ctx context.Context) {
 }
 
 func (s *NSQSource) Stop() {
-	s.consumer.Stop()
 	<-s.consumer.StopChan // 阻塞等待 NSQ 消费者完全停止，确保不再写入 Channel
-	//s.Asynchronizer.Stop()//Reader没起新goroutine不需要调用wg.Done
-}
-
-func (s *NSQSource) handlerFunc(message *nsq.Message) error {
-	// 使用select防止channel满时阻塞
-	select {
-	case s.Channel <- message.Body:
-		// 发送成功
-		return nil
-	default:
-		// channel已满，记录警告并重试
-		lg.DftLgr.Warn("NSQSource.handlerFunc channel full, message will be requeued")
-		// 返回错误让NSQ重新入队
-		return fmt.Errorf("channel full, requeue message")
-	}
+	s.consumer.Stop()
 }

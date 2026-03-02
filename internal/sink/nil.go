@@ -15,9 +15,9 @@ func init() {
 	component.RegCmpCreator("nil-sink", newNilSink)
 }
 
-func newNilSink(opts *option.Options) (component.Component, error) {
+func newNilSink(name string, opts *option.Options) (component.Component, error) {
 	return &nilSink{
-		Asynchronizer: component.NewAsynchronizer(),
+		Asynchronizer: component.NewAsynchronizer(name),
 	}, nil
 }
 

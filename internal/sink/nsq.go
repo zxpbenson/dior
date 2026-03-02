@@ -24,9 +24,9 @@ func init() {
 	component.RegCmpCreator("nsq-sink", newNSQSink)
 }
 
-func newNSQSink(opts *option.Options) (component.Component, error) {
+func newNSQSink(name string, opts *option.Options) (component.Component, error) {
 	return &nsqSink{
-		Asynchronizer:    component.NewAsynchronizer(),
+		Asynchronizer:    component.NewAsynchronizer(name),
 		topic:            opts.DstTopic,
 		nsqdTCPAddresses: opts.DstNSQDTCPAddresses,
 		nsqdLen:          len(opts.DstNSQDTCPAddresses),
@@ -68,9 +68,9 @@ func (s *nsqSink) Start(ctx context.Context) {
 }
 
 func (s *nsqSink) Stop() {
-	s.Asynchronizer.Stop()
 	for _, producer := range s.producers {
 		producer.Stop()
 	}
+	s.Asynchronizer.Stop()
 	lg.DftLgr.Info("nsqSink.Stop done.")
 }

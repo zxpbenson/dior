@@ -48,11 +48,9 @@ type Asynchronizer struct {
 	Channel chan []byte
 	Output  OutputFunc
 
-	// 状态管理
-	state atomic.Int32
-
-	// 错误处理
-	onError ErrorHandler
+	name    string       // component name
+	state   atomic.Int32 // 状态管理
+	onError ErrorHandler // 错误处理
 
 	// 统计信息
 	processedCount atomic.Int64
@@ -60,9 +58,9 @@ type Asynchronizer struct {
 }
 
 // NewAsynchronizer 创建新的Asynchronizer实例
-func NewAsynchronizer() *Asynchronizer {
-	a := &Asynchronizer{}
-	a.setState(CompStateIdle)
+func NewAsynchronizer(name string) *Asynchronizer {
+	a := &Asynchronizer{name: name}
+	a.SetState(CompStateIdle)
 	return a
 }
 
@@ -87,13 +85,19 @@ func (a *Asynchronizer) GetState() ComponentState {
 }
 
 // SetState 获取当前状态
-func (a *Asynchronizer) setState(state ComponentState) {
+func (a *Asynchronizer) SetState(state ComponentState) {
 	a.state.Store(int32(state))
 }
 
 // GetStats 获取统计信息
 func (a *Asynchronizer) GetStats() (processed, errors int64) {
 	return a.processedCount.Load(), a.errorCount.Load()
+}
+
+// 打印统计信息
+func (a *Asynchronizer) ShowStats() {
+	lg.DftLgr.Info("Asynchronizer.work stopped for %s, processed=%d, errors=%d",
+		a.name, a.processedCount.Load(), a.errorCount.Load())
 }
 
 // work 是Sink组件的核心工作循环
@@ -103,7 +107,7 @@ func (a *Asynchronizer) GetStats() (processed, errors int64) {
 // - 通过panic恢复来处理异常
 func (a *Asynchronizer) work(ctx context.Context) {
 	a.control.Add(1)
-	a.setState(CompStateRunning)
+	a.SetState(CompStateRunning)
 	defer func() {
 		if err := recover(); err != nil {
 			lg.DftLgr.Error("Asynchronizer.work panic recovered: %v", err)
@@ -112,10 +116,9 @@ func (a *Asynchronizer) work(ctx context.Context) {
 				a.onError(fmt.Errorf("panic: %v", err))
 			}
 		}
-		a.setState(CompStateStopped)
+		a.SetState(CompStateStopped)
 		a.control.Done()
-		lg.DftLgr.Info("Asynchronizer.work stopped, processed=%d, errors=%d",
-			a.processedCount.Load(), a.errorCount.Load())
+		a.ShowStats()
 	}()
 
 	for {
@@ -158,11 +161,13 @@ func (a *Asynchronizer) drainChannel() {
 		select {
 		case data, ok := <-a.Channel:
 			if !ok {
+				lg.DftLgr.Warn("Asynchronizer.drainChannel channel closed and empty, exiting gracefully")
 				return
 			}
 			a.processData(data)
 		default:
 			// channel已空
+			lg.DftLgr.Warn("Asynchronizer.drainChannel channel empty, exiting gracefully")
 			return
 		}
 	}
@@ -178,7 +183,7 @@ func (a *Asynchronizer) Start(ctx context.Context) {
 // Stop 停止异步处理
 // 注意：Asynchronizer本身不执行停止操作，由Controller通过关闭channel来触发退出
 func (a *Asynchronizer) Stop() {
-	a.setState(CompStateStopping)
+	a.SetState(CompStateStopping)
 	lg.DftLgr.Info("Asynchronizer.Stop called, state=%s", a.GetState())
 }
 
