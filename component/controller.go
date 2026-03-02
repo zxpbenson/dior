@@ -160,7 +160,7 @@ func (c *Controller) Start() {
 	c.setState(StateRunning)
 
 	// 监听系统信号
-	signal.Notify(c.sysSig, os.Interrupt, syscall.SIGINT, syscall.SIGQUIT)
+	signal.Notify(c.sysSig, os.Interrupt, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
 	// 阻塞等待停止信号
 	sig := <-c.sysSig
