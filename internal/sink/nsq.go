@@ -5,6 +5,8 @@ import (
 	"dior/component"
 	"dior/internal/lg"
 	"dior/option"
+	"sync/atomic"
+
 	"github.com/nsqio/go-nsq"
 )
 
@@ -15,7 +17,7 @@ type nsqSink struct {
 	topic            string
 	nsqdTCPAddresses []string
 	nsqdLen          int
-	nsqdIndex        int
+	nsqdIndex        atomic.Int64 // 使用atomic保证并发安全
 }
 
 func init() {
@@ -24,11 +26,10 @@ func init() {
 
 func newNSQSink(opts *option.Options) (component.Component, error) {
 	return &nsqSink{
-		Asynchronizer:    &component.Asynchronizer{},
+		Asynchronizer:    component.NewAsynchronizer(),
 		topic:            opts.DstTopic,
 		nsqdTCPAddresses: opts.DstNSQDTCPAddresses,
 		nsqdLen:          len(opts.DstNSQDTCPAddresses),
-		nsqdIndex:        0,
 	}, nil
 }
 
@@ -49,8 +50,17 @@ func (s *nsqSink) Init(channel chan []byte) (err error) {
 }
 
 func (s *nsqSink) output(data []byte) {
-	s.producers[s.nsqdIndex].Publish(s.topic, data)
-	s.nsqdIndex = (s.nsqdIndex + 1) % s.nsqdLen
+	// 轮询选择producer（原子操作保证并发安全）
+	index := s.nsqdIndex.Add(1) - 1
+	producer := s.producers[index%int64(s.nsqdLen)]
+
+	// 发送消息
+	err := producer.Publish(s.topic, data)
+	if err != nil {
+		lg.DftLgr.Error("nsqSink.output publish failed, topic: %s, error: %v", s.topic, err)
+		return
+	}
+	lg.DftLgr.Debug("nsqSink.output publish ok, topic: %s", s.topic)
 }
 
 func (s *nsqSink) Start(ctx context.Context) {

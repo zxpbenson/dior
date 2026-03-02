@@ -6,6 +6,7 @@ import (
 	"dior/internal/lg"
 	"dior/option"
 	"github.com/IBM/sarama"
+	"time"
 )
 
 type kafkaSink struct {
@@ -22,7 +23,7 @@ func init() {
 
 func newkafkaSink(opts *option.Options) (component.Component, error) {
 	return &kafkaSink{
-		Asynchronizer:         &component.Asynchronizer{},
+		Asynchronizer:         component.NewAsynchronizer(),
 		kafkaBootstrapServers: opts.DstBootstrapServers,
 		topic:                 opts.DstTopic,
 	}, nil
@@ -62,11 +63,26 @@ func (s *kafkaSink) produce(data []byte) {
 	msg.Topic = s.topic
 	msg.Value = sarama.ByteEncoder(data)
 
-	// 发送消息
-	partitionId, offset, err := s.producer.SendMessage(msg)
-	if err != nil {
-		lg.DftLgr.Error("kafkaSink.produce send msg failed, err : %v", err)
-		return
+	// 发送消息，带重试机制
+	const maxRetries = 3
+	var lastErr error
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		partitionId, offset, err := s.producer.SendMessage(msg)
+		if err == nil {
+			lg.DftLgr.Debug("kafkaSink.produce send msg ok, pid: %v offset: %v", partitionId, offset)
+			return
+		}
+
+		lastErr = err
+		lg.DftLgr.Warn("kafkaSink.produce send msg failed (attempt %d/%d): %v", attempt, maxRetries, err)
+
+		// 最后一次重试不需要等待
+		if attempt < maxRetries {
+			time.Sleep(time.Duration(attempt) * 100 * time.Millisecond)
+		}
 	}
-	lg.DftLgr.Debug("kafkaSink.produce send msg ok, pid : %v offset : %v", partitionId, offset)
+
+	// 所有重试都失败
+	lg.DftLgr.Error("kafkaSink.produce send msg failed after %d attempts, last error: %v", maxRetries, lastErr)
 }

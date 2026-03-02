@@ -6,6 +6,7 @@ import (
 	"dior/internal/cache"
 	"dior/internal/lg"
 	"dior/option"
+	"fmt"
 	"time"
 )
 
@@ -25,7 +26,7 @@ func init() {
 
 func newPressSource(opts *option.Options) (component.Component, error) {
 	return &PressSource{
-		Asynchronizer: &component.Asynchronizer{},
+		Asynchronizer: component.NewAsynchronizer(),
 		cache:         cache.NewCache(opts.SrcScannerBufSizeMb),
 		dataFile:      opts.SrcFile,
 		writeDone:     make(chan int64),
@@ -40,20 +41,16 @@ func (s *PressSource) Init(channel chan []byte) error {
 }
 
 func (s *PressSource) Start(ctx context.Context) {
-	//s.Asynchronizer.Start(ctx)//自己实现了定制化的Start
+	// 自定义Start实现，没有使用 component.Asynchronizer 默认实现
 	go s.doSend(ctx)
-	go s.generate(ctx)
+	go s.doCmd(ctx)
 }
 
-func (s *PressSource) Stop() {
-	s.Asynchronizer.Stop()
-}
-
-func (s *PressSource) generate(ctx context.Context) {
+func (s *PressSource) doCmd(ctx context.Context) {
 	s.Add(1)
 	defer func() {
 		if err := recover(); err != nil {
-			lg.DftLgr.Error("PressSource.generate recover error : %v", err)
+			lg.DftLgr.Error("PressSource.doCmd recover error : %v", err)
 		}
 		s.Done()
 	}()
@@ -68,24 +65,24 @@ LABEL: // 以1秒为周期，固定发压或者检测发压是否结束
 	for {
 		select {
 		case <-ctx.Done():
-			lg.DftLgr.Warn("PressSource.generate receive quit cmd")
+			lg.DftLgr.Warn("PressSource.doCmd receive quit cmd")
 			break LABEL
 		case t := <-ticker.C:
 			if writing {
-				lg.DftLgr.Warn("PressSource.generate write delay, start time : %v, current time: %v, you should reduce speed immediately.", start, t)
+				lg.DftLgr.Warn("PressSource.doCmd write delay, start time : %v, current time: %v, you should reduce speed immediately.", start, t)
 				continue LABEL
 			}
 			start = time.Now()
-			lg.DftLgr.Debug("PressSource.generate trigger write task and reset Ticker : %v", start)
+			lg.DftLgr.Debug("PressSource.doCmd trigger write task and reset Ticker : %v", start)
 			writing = true
 			s.writeCmd <- s.speed
 			ticker.Reset(time.Second)
 		case speed := <-s.writeDone:
 			writing = false
-			lg.DftLgr.Info("PressSource.generate config speed %d, current speed %d", s.speed, speed)
+			lg.DftLgr.Info("PressSource.doCmd config speed %d, current speed %d", s.speed, speed)
 		}
 	}
-	lg.DftLgr.Info("PressSource.generate do send done")
+	lg.DftLgr.Info("PressSource.doCmd do cmd done")
 }
 
 func (s *PressSource) doSend(ctx context.Context) {
@@ -108,7 +105,7 @@ LABEL:
 		case limit := <-s.writeCmd:
 			if limit > 0 {
 				lg.DftLgr.Debug("PressSource.doSend receive send cmd : %v", limit)
-				count, err := s.writeLoop(limit, ticket)
+				count, err := s.writeLoop(ctx, limit, ticket)
 				if err != nil {
 					lg.DftLgr.Error("PressSource.doSend send fail : %v", err)
 				}
@@ -125,12 +122,29 @@ LABEL:
 	lg.DftLgr.Info("PressSource.doSend do send done")
 }
 
-func (s *PressSource) writeLoop(limit int64, ticket *cache.Ticket) (count int64, err error) {
+func (s *PressSource) writeLoop(ctx context.Context, limit int64, ticket *cache.Ticket) (count int64, err error) {
 	for cnt := int64(1); cnt <= limit; cnt++ {
 		data := s.cache.Next(ticket)
-		s.Channel <- data
-		count = cnt
+
+		// 使用select防止channel满时阻塞
+		select {
+		case s.Channel <- data:
+			count = cnt
+		case <-ctx.Done():
+			lg.DftLgr.Warn("PressSource.writeLoop context cancelled, stopping at count %d", count)
+			return count, nil
+		default:
+			// channel已满，记录警告
+			lg.DftLgr.Warn("PressSource.writeLoop channel full, stopping at count %d", count)
+			return count, fmt.Errorf("channel full")
+		}
 	}
-	lg.DftLgr.Debug("PressSource.doSend send data count : %v", limit)
+	lg.DftLgr.Debug("PressSource.writeLoop sent data count: %v", limit)
 	return
+}
+
+func (s *PressSource) Stop() {
+	// PressSource的goroutine通过ctx.Done()退出
+	// 这里不需要额外操作，但保留方法以便将来扩展
+	lg.DftLgr.Info("PressSource.Stop called, goroutines will exit via context cancellation")
 }

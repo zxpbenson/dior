@@ -7,16 +7,18 @@ import (
 	"dior/internal/lg"
 	"dior/option"
 	"os"
+	"sync/atomic"
 )
 
 type fileSink struct {
 	*component.Asynchronizer
 
-	fileName string
-	file     *os.File
-	writer   *bufio.Writer
-	splitter []byte
-	bufSize  int
+	fileName       string
+	file           *os.File
+	writer         *bufio.Writer
+	splitter       []byte
+	bufSize        int
+	processedCount atomic.Int64 // 跟踪写入条数
 }
 
 func init() {
@@ -25,7 +27,7 @@ func init() {
 
 func newFileSink(opts *option.Options) (component.Component, error) {
 	return &fileSink{
-		Asynchronizer: &component.Asynchronizer{},
+		Asynchronizer: component.NewAsynchronizer(),
 		fileName:      opts.DstFile,
 		splitter:      []byte("\n"),
 		bufSize:       opts.DstBufSizeByte,
@@ -44,29 +46,49 @@ func (s *fileSink) Init(channel chan []byte) (err error) {
 	return
 }
 
+func (s *fileSink) output(data []byte) {
+	lg.DftLgr.Debug("FileSink.output data: %v", data)
+
+	// 写入数据
+	n, err := s.writer.Write(data)
+	if err != nil {
+		lg.DftLgr.Error("FileSink.output write data error: %v", err)
+		return
+	}
+	lg.DftLgr.Debug("FileSink.output write file %s byte count: %v", s.fileName, n)
+
+	// 写入分隔符
+	n, err = s.writer.Write(s.splitter)
+	if err != nil {
+		lg.DftLgr.Error("FileSink.output write separator error: %v", err)
+		return
+	}
+
+	// 每写入100条数据刷新一次缓冲区，避免内存占用过高
+	if s.processedCount.Add(1)%100 == 0 {
+		if err := s.writer.Flush(); err != nil {
+			lg.DftLgr.Error("FileSink.output flush error: %v", err)
+		}
+	}
+}
+
 func (s *fileSink) Start(ctx context.Context) {
 	s.Asynchronizer.Start(ctx)
 }
 
-func (s *fileSink) output(data []byte) {
-	lg.DftLgr.Debug("FileSink.output data : %v", data)
-	n, err := s.writer.Write(data)
-	if err == nil {
-		lg.DftLgr.Debug("FileSink.output write file %s byte count : %v", s.fileName, n)
-	} else {
-		lg.DftLgr.Error("FileSink.output write file %s error : %v", s.fileName, err)
-	}
-	n, err = s.writer.Write(s.splitter)
-	if err == nil {
-		//lg.DftLgr.Debug("FileSink.output write file %s byte count : %v", s.fileName, n)
-	} else {
-		lg.DftLgr.Error("FileSink.output write file %s error : %v", s.fileName, err)
-	}
-}
-
 func (s *fileSink) Stop() {
+	// 先刷新缓冲区
+	if err := s.writer.Flush(); err != nil {
+		lg.DftLgr.Error("FileSink.Stop flush error: %v", err)
+	}
+
+	// 关闭文件
+	if err := s.file.Close(); err != nil {
+		lg.DftLgr.Error("FileSink.Stop close error: %v", err)
+	}
+
+	// 停止异步处理
 	s.Asynchronizer.Stop()
-	s.writer.Flush()
-	s.file.Close()
+
 	lg.DftLgr.Info("FileSink.Stop done.")
 }

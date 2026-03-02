@@ -21,7 +21,7 @@ type KafkaSource struct {
 	topic                 string               // init in source.newKafkaSource
 	group                 string               // init in source.newKafkaSource
 
-	ctx    context.Context    // init in source.KafkaSource.Start
+	// cancel 用于取消消费循环，不保存context
 	cancel context.CancelFunc // init in source.KafkaSource.Start
 }
 
@@ -31,7 +31,7 @@ func init() {
 
 func newKafkaSource(opts *option.Options) (component.Component, error) {
 	return &KafkaSource{
-		Asynchronizer:         &component.Asynchronizer{},
+		Asynchronizer:         component.NewAsynchronizer(),
 		consumer:              &kafka.Consumer{},
 		kafkaBootstrapServers: opts.SrcBootstrapServers,
 		topic:                 opts.SrcTopic,
@@ -63,45 +63,73 @@ func (s *KafkaSource) Init(channel chan []byte) (err error) {
 }
 
 func (s *KafkaSource) Start(ctx context.Context) {
-
-	s.ctx, s.cancel = context.WithCancel(ctx)
+	// 创建可取消的子上下文
+	// 注意：cancel保存在结构体中是因为Stop()需要调用它来取消消费循环
+	// 这是Go官方允许的模式：保存cancel但不保存context
+	ctx, s.cancel = context.WithCancel(ctx)
 
 	s.Add(1)
 	s.consumer.Prepare(s.consume)
 	go func() {
-		defer s.Done()
+		defer func() {
+			if err := recover(); err != nil {
+				lg.DftLgr.Error("KafkaSource.Start panic recovered: %v", err)
+			}
+			s.Done()
+			lg.DftLgr.Info("KafkaSource.Start goroutine exited")
+		}()
+
 		backoff := time.Second
+		maxBackoff := 30 * time.Second
+		consecutiveErrors := 0
+		maxConsecutiveErrors := 10
+
 		for {
 			// `Consume` should be called inside an infinite loop, when a
 			// server-side rebalance happens, the consumer session will need to be
 			// recreated to get the new claims
-			if err := s.client.Consume(s.ctx, []string{s.topic}, s.consumer); err != nil {
+			if err := s.client.Consume(ctx, []string{s.topic}, s.consumer); err != nil {
 				if errors.Is(err, sarama.ErrClosedConsumerGroup) {
+					lg.DftLgr.Info("KafkaSource.Start consumer group closed normally")
 					return
 				}
-				lg.DftLgr.Error("KafkaSource.Start nameless routine Error from consumer: %v, will retry after %v", err, backoff)
-				
+
+				consecutiveErrors++
+				lg.DftLgr.Error("KafkaSource.Start consume error (attempt %d/%d): %v, retrying after %v",
+					consecutiveErrors, maxConsecutiveErrors, err, backoff)
+
+				// 连续错误过多时退出
+				if consecutiveErrors >= maxConsecutiveErrors {
+					lg.DftLgr.Error("KafkaSource.Start too many consecutive errors, exiting")
+					return
+				}
+
 				select {
-				case <-s.ctx.Done():
+				case <-ctx.Done():
+					lg.DftLgr.Info("KafkaSource.Start context cancelled during backoff")
 					return
 				case <-time.After(backoff):
 				}
 
+				// 指数退避
 				backoff *= 2
-				if backoff > 10*time.Second {
-					backoff = 10 * time.Second
+				if backoff > maxBackoff {
+					backoff = maxBackoff
 				}
 			} else {
+				// 成功消费后重置退避和错误计数
 				backoff = time.Second
+				consecutiveErrors = 0
 			}
-			if s.ctx.Err() != nil {
+
+			// 检查上下文是否已取消
+			if ctx.Err() != nil {
+				lg.DftLgr.Info("KafkaSource.Start context cancelled, exiting")
 				return
 			}
 			s.consumer.ResetReady()
 		}
 	}()
-
-	s.consumer.WaitReady(s.ctx)
 }
 
 func (s *KafkaSource) Stop() {
@@ -114,5 +142,13 @@ func (s *KafkaSource) Stop() {
 }
 
 func (s *KafkaSource) consume(msg *sarama.ConsumerMessage) {
-	s.Channel <- msg.Value
+	// 使用select防止channel满时阻塞
+	select {
+	case s.Channel <- msg.Value:
+		// 发送成功
+	default:
+		// channel已满，记录警告并丢弃消息
+		lg.DftLgr.Warn("KafkaSource.consume channel full, dropping message (topic: %s, partition: %d, offset: %d)",
+			msg.Topic, msg.Partition, msg.Offset)
+	}
 }

@@ -17,7 +17,7 @@ func init() {
 
 func newNilSink(opts *option.Options) (component.Component, error) {
 	return &nilSink{
-		Asynchronizer: &component.Asynchronizer{},
+		Asynchronizer: component.NewAsynchronizer(),
 	}, nil
 }
 
@@ -27,6 +27,10 @@ func (s *nilSink) Init(channel chan []byte) (err error) {
 	return nil
 }
 
+func (s *nilSink) output(data []byte) {
+	lg.DftLgr.Debug("NilSink.output data : %v", data)
+}
+
 func (s *nilSink) Start(ctx context.Context) {
 	s.Asynchronizer.Start(ctx)
 }
@@ -34,8 +38,4 @@ func (s *nilSink) Start(ctx context.Context) {
 func (s *nilSink) Stop() {
 	s.Asynchronizer.Stop()
 	lg.DftLgr.Info("NilSink.Stop done.")
-}
-
-func (s *nilSink) output(data []byte) {
-	lg.DftLgr.Debug("NilSink.output data : %v", data)
 }

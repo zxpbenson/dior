@@ -5,6 +5,7 @@ import (
 	"dior/component"
 	"dior/internal/lg"
 	"dior/option"
+	"fmt"
 	"github.com/nsqio/go-nsq"
 )
 
@@ -24,7 +25,7 @@ func init() {
 
 func newNSQSource(opts *option.Options) (component.Component, error) {
 	return &NSQSource{
-		Asynchronizer: &component.Asynchronizer{},
+		Asynchronizer: component.NewAsynchronizer(),
 		nsqds:         opts.SrcNSQDTCPAddresses,
 		nsqLookupds:   opts.SrcLookupdTCPAddresses,
 		topic:         opts.SrcTopic,
@@ -44,23 +45,24 @@ func (s *NSQSource) Init(channel chan []byte) (err error) {
 }
 
 func (s *NSQSource) Start(ctx context.Context) {
+	// 修复：移除多余的return，确保后续代码执行
 	if len(s.nsqds) > 0 {
 		err := s.consumer.ConnectToNSQDs(s.nsqds)
 		if err != nil {
-			lg.DftLgr.Error("NSQSource.Init connect to nsqds fail, nsqds : %v, err : %v", s.nsqds, err)
+			lg.DftLgr.Error("NSQSource.Start connect to nsqds fail, nsqds: %v, err: %v", s.nsqds, err)
 		}
-		return
-	}
-
-	if len(s.nsqLookupds) > 0 {
+	} else if len(s.nsqLookupds) > 0 {
 		err := s.consumer.ConnectToNSQLookupds(s.nsqLookupds)
 		if err != nil {
-			lg.DftLgr.Error("NSQSource.Init connect to nsqlookupds fail, nsqlookupds : %v, err : %v", s.nsqLookupds, err)
+			lg.DftLgr.Error("NSQSource.Start connect to nsqlookupds fail, nsqlookupds: %v, err: %v", s.nsqLookupds, err)
 		}
+	} else {
+		lg.DftLgr.Error("NSQSource.Start requires either nsqds or nsqlookupds")
 		return
 	}
 
-	lg.DftLgr.Error("NSQSource.Init required nsqds or nsqlookupds")
+	// 启动异步处理
+	s.Asynchronizer.Start(ctx)
 }
 
 func (s *NSQSource) Stop() {
@@ -70,6 +72,15 @@ func (s *NSQSource) Stop() {
 }
 
 func (s *NSQSource) handlerFunc(message *nsq.Message) error {
-	s.Channel <- message.Body
-	return nil
+	// 使用select防止channel满时阻塞
+	select {
+	case s.Channel <- message.Body:
+		// 发送成功
+		return nil
+	default:
+		// channel已满，记录警告并重试
+		lg.DftLgr.Warn("NSQSource.handlerFunc channel full, message will be requeued")
+		// 返回错误让NSQ重新入队
+		return fmt.Errorf("channel full, requeue message")
+	}
 }
