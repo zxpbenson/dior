@@ -186,7 +186,6 @@ classDiagram
     Controller *-- sync.WaitGroup : sinkWG
     
     KafkaSource o-- kafka_Consumer : consumer
-}
 ```
 
 ## Data Flow Diagram
