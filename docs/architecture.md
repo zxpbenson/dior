@@ -1,14 +1,14 @@
-# Dior 项目架构文档
+# Dior Architecture Documentation
 
-## 项目概述
+## Project Overview
 
-Dior 是一个数据传输工具，支持多种数据源（Kafka、NSQ、Press）到多种目标（Kafka、NSQ、File）的数据传输。
+Dior is a data transmission tool that supports data transfer from multiple sources (Kafka, NSQ, Press) to multiple destinations (Kafka, NSQ, File).
 
-## 核心类图
+## Core Class Diagram
 
 ```mermaid
 classDiagram
-    %% 核心接口
+    %% Core interfaces
     class Component {
         <<interface>>
         +Init(channel chan []byte) error
@@ -64,7 +64,7 @@ classDiagram
         -drainChannel()
     }
     
-    %% Source组件
+    %% Source components
     class KafkaSource {
         -consumer *kafka.Consumer
         -client sarama.ConsumerGroup
@@ -104,7 +104,7 @@ classDiagram
         -writeLoop(ctx context.Context, limit int64, ticket *cache.Ticket) (count int64, err error)
     }
     
-    %% Sink组件
+    %% Sink components
     class kafkaSink {
         -producer sarama.SyncProducer
         -kafkaBootstrapServers []string
@@ -147,7 +147,7 @@ classDiagram
         -output(data []byte)
     }
     
-    %% 辅助类型
+    %% Auxiliary types
     class kafka_Consumer {
         <<internal/kafka>>
         -ready chan bool
@@ -160,9 +160,9 @@ classDiagram
         +ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error
     }
     
-    %% 关系
+    %% Relationships
     Controllable <|-- Component
-    Component <|.. Controller : 不实现
+    Component <|.. Controller : not implemented
     Component <|.. KafkaSource
     Component <|.. NSQSource
     Component <|.. PressSource
@@ -171,14 +171,14 @@ classDiagram
     Component <|.. nsqSink
     Component <|.. nilSink
     
-    Asynchronizer *-- Component : 组合关系
-    KafkaSource --|> Asynchronizer : 继承
-    NSQSource --|> Asynchronizer : 继承
-    PressSource --|> Asynchronizer : 继承
-    kafkaSink --|> Asynchronizer : 继承
-    fileSink --|> Asynchronizer : 继承
-    nsqSink --|> Asynchronizer : 继承
-    nilSink --|> Asynchronizer : 继承
+    Asynchronizer *-- Component : composition
+    KafkaSource --|> Asynchronizer : inheritance
+    NSQSource --|> Asynchronizer : inheritance
+    PressSource --|> Asynchronizer : inheritance
+    kafkaSink --|> Asynchronizer : inheritance
+    fileSink --|> Asynchronizer : inheritance
+    nsqSink --|> Asynchronizer : inheritance
+    nilSink --|> Asynchronizer : inheritance
     
     Controller o-- Component : source
     Controller o-- Component : sink
@@ -186,23 +186,24 @@ classDiagram
     Controller *-- sync.WaitGroup : sinkWG
     
     KafkaSource o-- kafka_Consumer : consumer
+}
 ```
 
-## 数据流图
+## Data Flow Diagram
 
 ```mermaid
 flowchart LR
-    subgraph Sources["数据源 (Source)"]
+    subgraph Sources["Sources"]
         KS[KafkaSource]
         NS[NSQSource]
         PS[PressSource]
     end
     
-    subgraph Controller["控制器 (Controller)"]
+    subgraph Controller["Controller"]
         CH[Channel]
     end
     
-    subgraph Sinks["目标 (Sink)"]
+    subgraph Sinks["Sinks"]
         KSi[kafkaSink]
         FSi[fileSink]
         NSi[nsqSink]
@@ -219,53 +220,53 @@ flowchart LR
     CH --> NilSi
 ```
 
-## 生命周期状态图
+## Lifecycle State Diagram
 
 ```mermaid
 stateDiagram-v2
     [*] --> StateInitialized: NewController()
     StateInitialized --> StateStarting: Start()
-    StateStarting --> StateRunning: 组件启动完成
-    StateRunning --> StateStopping: 收到停止信号
-    StateStopping --> StateStopped: 优雅关闭完成
+    StateStarting --> StateRunning: Components started successfully
+    StateRunning --> StateStopping: Received stop signal
+    StateStopping --> StateStopped: Graceful shutdown completed
     StateStopped --> [*]
     
     note right of StateRunning
-        监听系统信号:
+        Listens for system signals:
         - SIGINT
         - SIGQUIT
         - Interrupt
     end note
     
     note right of StateStopping
-        5阶段关闭:
-        1. 停止Source
-        2. 等待Source停止
-        3. 关闭Channel
-        4. 等待Sink排空
-        5. 停止Sink
+        5-phase shutdown:
+        1. Stop Source
+        2. Wait for Source to stop
+        3. Close Channel
+        4. Wait for Sink to drain
+        5. Stop Sink
     end note
 ```
 
-## 组件状态图
+## Component State Diagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> CompStateIdle: 创建
+    [*] --> CompStateIdle: Created
     CompStateIdle --> CompStateRunning: Start()
     CompStateRunning --> CompStateStopping: Stop()
-    CompStateStopping --> CompStateStopped: goroutine退出
+    CompStateStopping --> CompStateStopped: Goroutine exits
     CompStateStopped --> [*]
     
     note right of CompStateRunning
-        Sink: 从Channel读取数据
-        Source: 向Channel写入数据
+        Sink: Reads data from Channel
+        Source: Writes data to Channel
     end note
 ```
 
-## 接口定义
+## Interface Definitions
 
-### Component 接口
+### Component Interface
 
 ```go
 type Component interface {
@@ -276,7 +277,7 @@ type Component interface {
 }
 ```
 
-### Controllable 接口
+### Controllable Interface
 
 ```go
 type Controllable interface {
@@ -284,17 +285,17 @@ type Controllable interface {
 }
 ```
 
-### OutputFunc 类型
+### OutputFunc Type
 
 ```go
 type OutputFunc func(data []byte)
 ```
 
-## 组件注册机制
+## Component Registration Mechanism
 
 ```mermaid
 flowchart TB
-    subgraph init["init() 函数"]
+    subgraph init["init() functions"]
         KSi_init["kafka-sink init()"]
         FSi_init["file-sink init()"]
         NSi_init["nsq-sink init()"]
@@ -304,7 +305,7 @@ flowchart TB
         PS_init["press-source init()"]
     end
     
-    subgraph Registry["组件注册表"]
+    subgraph Registry["Component Registry"]
         Map["cmpCreatorMap map[string]ComponentCreator"]
     end
     
@@ -316,7 +317,7 @@ flowchart TB
     NS_init --> Map
     PS_init --> Map
     
-    subgraph Factory["工厂方法"]
+    subgraph Factory["Factory Method"]
         NC["NewComponent(name, opts)"]
     end
     
@@ -330,82 +331,82 @@ flowchart TB
     NC --> NilSi
 ```
 
-## 目录结构
+## Directory Structure
 
 ```
 dior/
 ├── cmd/
-│   ├── dior/           # 主程序入口
+│   ├── dior/           # Main application entry point
 │   │   └── main.go
-│   ├── kafka-consumer/ # Kafka消费者工具
+│   ├── kafka-consumer/ # Kafka consumer utility
 │   │   └── main.go
-│   └── some/           # 其他工具
+│   └── some/           # Other utilities
 │       └── main.go
-├── component/          # 核心组件
-│   ├── component.go    # 接口定义和工厂方法
-│   ├── controller.go   # 控制器
-│   └── async.go        # 异步处理基类
+├── component/          # Core components
+│   ├── component.go    # Interface definitions and factory methods
+│   ├── controller.go   # Controller
+│   └── async.go        # Asynchronous processing base class
 ├── internal/
-│   ├── cache/          # 缓存模块
-│   ├── kafka/          # Kafka消费者封装
-│   ├── lg/             # 日志模块
-│   ├── sink/           # Sink实现
+│   ├── cache/          # Caching module
+│   ├── kafka/          # Kafka consumer wrapper
+│   ├── lg/             # Logging module
+│   ├── sink/           # Sink implementations
 │   │   ├── file.go
 │   │   ├── kafka.go
 │   │   ├── nsq.go
 │   │   └── nil.go
-│   ├── source/         # Source实现
+│   ├── source/         # Source implementations
 │   │   ├── kafka.go
 │   │   ├── nsq.go
 │   │   └── press.go
-│   └── version/        # 版本信息
-├── option/             # 配置选项
+│   └── version/        # Version information
+├── option/             # Configuration options
 │   ├── option.go
 │   ├── env.go
 │   └── validate.go
 └── docs/
-    └── architecture.md # 本文档
+    └── architecture.md # This document
 ```
 
-## 设计模式
+## Design Patterns
 
-### 1. 工厂模式
-- [`NewComponent()`](component/component.go:32) 根据名称创建组件实例
-- [`RegCmpCreator()`](component/component.go:23) 注册组件创建器
+### 1. Factory Pattern
+- [`NewComponent()`](component/component.go:32) creates component instances by name
+- [`RegCmpCreator()`](component/component.go:23) registers component creators
 
-### 2. 组合模式
-- `Asynchronizer` 被所有Source和Sink组件组合
-- 提供通用的异步处理能力
+### 2. Composite Pattern
+- `Asynchronizer` is composed by all Source and Sink components
+- Provides common asynchronous processing capabilities
 
-### 3. 模板方法模式
-- `Asynchronizer.work()` 定义了Sink的处理流程
-- 子类通过设置 `Output` 函数定制具体行为
+### 3. Template Method Pattern
+- `Asynchronizer.work()` defines the processing flow for Sinks
+- Subclasses customize specific behavior by setting the `Output` function
 
-### 4. 状态模式
-- `Controller` 使用 `State` 管理生命周期
-- `Asynchronizer` 使用 `ComponentState` 管理组件状态
+### 4. State Pattern
+- `Controller` uses `State` to manage lifecycle
+- `Asynchronizer` uses `ComponentState` to manage component state
 
-## 关键设计决策
+## Key Design Decisions
 
-### 1. Context 使用规范
-- **不在结构体中保存 `context.Context`**
-- 只在必要时保存 `context.CancelFunc`（如 KafkaSource、Controller）
-- 所有方法通过参数传递 context
+### 1. Context Usage Guidelines
+- **Do not store `context.Context` in structs**
+- Only store `context.CancelFunc` when necessary (e.g., KafkaSource, Controller)
+- Pass context as a parameter to all methods
 
-### 2. 优雅关闭流程
-1. 调用 `cancel()` 取消 context
-2. 调用 `source.Stop()` 停止生产
-3. 等待 Source goroutines 退出
-4. 关闭 Channel
-5. 等待 Sink 排空数据
-6. 调用 `sink.Stop()` 释放资源
+### 2. Graceful Shutdown Process
+1. Call `cancel()` to cancel context
+2. Call `source.Stop()` to stop production
+3. Wait for Source goroutines to exit
+4. Close Channel
+5. Wait for Sink to drain data
+6. Call `sink.Stop()` to release resources
 
-### 3. 并发安全
-- 使用 `atomic.Int32/Int64` 管理状态和计数器
-- 使用 `sync.RWMutex` 保护状态访问
-- 使用 `sync.WaitGroup` 等待 goroutines 退出
+### 3. Concurrency Safety
+- Use `atomic.Int32/Int64` to manage state and counters
+- Use `sync.RWMutex` to protect state access
+- Use `sync.WaitGroup` to wait for goroutines to exit
 
-### 4. 错误处理
-- panic 恢复机制
-- 错误计数统计
-- 可配置的错误处理回调
+### 4. Error Handling
+- Panic recovery mechanism
+- Error counting and statistics
+- Configurable error handling callbacks
