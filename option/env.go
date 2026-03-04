@@ -17,8 +17,8 @@ func (o *Options) loadEnv() (err error) {
 	if srcTopic := os.Getenv("src-topic"); srcTopic != "" {
 		o.SrcTopic = srcTopic
 	}
-	if srcLookupdTcpAddresses := os.Getenv("src-lookupd-tcp-addresses"); srcLookupdTcpAddresses != "" {
-		o.SrcLookupdTCPAddresses = strings.Split(srcLookupdTcpAddresses, ",")
+	if srcLookupdHTTPAddresses := os.Getenv("src-lookupd-http-addresses"); srcLookupdHTTPAddresses != "" {
+		o.SrcLookupdHTTPAddresses = strings.Split(srcLookupdHTTPAddresses, ",")
 	}
 	if srcNSQDTCPAddresses := os.Getenv("src-nsqd-tcp-addresses"); srcNSQDTCPAddresses != "" {
 		o.SrcNSQDTCPAddresses = strings.Split(srcNSQDTCPAddresses, ",")
@@ -45,8 +45,8 @@ func (o *Options) loadEnv() (err error) {
 	if dst := os.Getenv("dst"); dst != "" {
 		o.Dst = dst
 	}
-	if dstLookupdTCPAddresses := os.Getenv("dst-lookupd-tcp-address"); dstLookupdTCPAddresses != "" {
-		o.DstLookupdTCPAddresses = strings.Split(dstLookupdTCPAddresses, ",")
+	if dstLookupdHTTPAddresses := os.Getenv("dst-lookupd-http-address"); dstLookupdHTTPAddresses != "" {
+		o.DstLookupdHTTPAddresses = strings.Split(dstLookupdHTTPAddresses, ",")
 	}
 	if dstNSQDTCPAddresses := os.Getenv("dst-nsqd-tcp-address"); dstNSQDTCPAddresses != "" {
 		o.DstNSQDTCPAddresses = strings.Split(dstNSQDTCPAddresses, ",")

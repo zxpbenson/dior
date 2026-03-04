@@ -12,11 +12,11 @@ import (
 type NSQSource struct {
 	*component.Asynchronizer
 
-	consumer    *nsq.Consumer
-	nsqds       []string
-	nsqLookupds []string
-	topic       string
-	channel     string
+	consumer             *nsq.Consumer
+	nsqdTCPAddresses     []string
+	lookupdHTTPAddresses []string
+	topic                string
+	channel              string
 }
 
 func init() {
@@ -25,11 +25,11 @@ func init() {
 
 func newNSQSource(name string, opts *option.Options) (component.Component, error) {
 	return &NSQSource{
-		Asynchronizer: component.NewAsynchronizer(name),
-		nsqds:         opts.SrcNSQDTCPAddresses,
-		nsqLookupds:   opts.SrcLookupdTCPAddresses,
-		topic:         opts.SrcTopic,
-		channel:       opts.SrcChannel,
+		Asynchronizer:        component.NewAsynchronizer(name),
+		nsqdTCPAddresses:     opts.SrcNSQDTCPAddresses,
+		lookupdHTTPAddresses: opts.SrcLookupdHTTPAddresses,
+		topic:                opts.SrcTopic,
+		channel:              opts.SrcChannel,
 	}, nil
 }
 
@@ -62,15 +62,15 @@ func (s *NSQSource) handlerFunc(message *nsq.Message) error {
 func (s *NSQSource) Start(ctx context.Context) {
 	s.Asynchronizer.SetState(component.CompStateRunning)
 
-	if len(s.nsqds) > 0 {
-		err := s.consumer.ConnectToNSQDs(s.nsqds)
+	if len(s.nsqdTCPAddresses) > 0 {
+		err := s.consumer.ConnectToNSQDs(s.nsqdTCPAddresses)
 		if err != nil {
-			lg.DftLgr.Error("NSQSource.Start connect to nsqds fail, nsqds: %v, err: %v", s.nsqds, err)
+			lg.DftLgr.Error("NSQSource.Start connect to nsqds fail, nsqds: %v, err: %v", s.nsqdTCPAddresses, err)
 		}
-	} else if len(s.nsqLookupds) > 0 {
-		err := s.consumer.ConnectToNSQLookupds(s.nsqLookupds)
+	} else if len(s.lookupdHTTPAddresses) > 0 {
+		err := s.consumer.ConnectToNSQLookupds(s.lookupdHTTPAddresses)
 		if err != nil {
-			lg.DftLgr.Error("NSQSource.Start connect to nsqlookupds fail, nsqlookupds: %v, err: %v", s.nsqLookupds, err)
+			lg.DftLgr.Error("NSQSource.Start connect to nsqlookupds fail, nsqlookupds: %v, err: %v", s.lookupdHTTPAddresses, err)
 		}
 	} else {
 		lg.DftLgr.Error("NSQSource.Start requires either nsqds or nsqlookupds")

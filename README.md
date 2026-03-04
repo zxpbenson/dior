@@ -145,7 +145,7 @@ Dior can be configured via command-line arguments or environment variables.
 | `--src-channel` | - | Source channel (for NSQ) |
 | `--src-group` | - | Consumer group (for Kafka) |
 | `--src-bootstrap-servers` | - | Kafka brokers (comma-separated) |
-| `--src-lookupd-tcp-addresses` | - | NSQ Lookupd addresses (comma-separated) |
+| `--src-lookupd-http-addresses` | - | NSQ Lookupd HTTP addresses (comma-separated) |
 | `--src-nsqd-tcp-addresses` | - | NSQD addresses (comma-separated) |
 | `--src-speed` | 10 | Messages per second (for press, 0 = unlimited) |
 | `--src-file` | - | Data file path (for press) |
@@ -158,7 +158,8 @@ Dior can be configured via command-line arguments or environment variables.
 | `--dst` | - | Destination type: nsq, kafka, file, nil |
 | `--dst-topic` | - | Destination topic (for NSQ/Kafka) |
 | `--dst-bootstrap-servers` | - | Kafka brokers (comma-separated) |
-| `--dst-nsqd-tcp-addresses` | - | NSQD addresses (comma-separated) |
+| `--dst-nsqd-tcp-addresses` | - | NSQD TCP addresses (comma-separated) |
+| `--dst-lookupd-http-addresses` | - | NSQ Lookupd HTTP addresses (comma-separated) |
 | `--dst-file` | - | Output file path (for file sink) |
 | `--dst-buf-size-byte` | 4096 | Write buffer size in bytes (for file sink) |
 
@@ -238,7 +239,7 @@ Test source performance without actual write operations:
 ```bash
 ./build/dior \
   --src nsq \
-  --src-lookupd-tcp-addresses 127.0.0.1:4161 \
+  --src-lookupd-http-addresses 127.0.0.1:4161 \
   --src-topic topic_from \
   --src-channel benson \
   --dst nsq \
@@ -264,7 +265,7 @@ Test source performance without actual write operations:
 ```bash
 ./build/dior \
   --src nsq \
-  --src-lookupd-tcp-addresses 127.0.0.1:4161 \
+  --src-lookupd-http-addresses 127.0.0.1:4161 \
   --src-topic topic_from \
   --src-channel benson \
   --dst kafka \
@@ -289,7 +290,7 @@ Test source performance without actual write operations:
 ```bash
 ./build/dior \
   --src nsq \
-  --src-lookupd-tcp-addresses 127.0.0.1:4161 \
+  --src-lookupd-http-addresses 127.0.0.1:4161 \
   --src-topic topic_from \
   --src-channel benson \
   --dst file \

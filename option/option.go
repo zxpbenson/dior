@@ -12,26 +12,26 @@ type Options struct {
 	LogLevel  string `flag:"log-level"`
 	LogPrefix string `flag:"log-prefix"`
 
-	Src                    string   `flag:"src"` // nsq / kafka / press
-	SrcTopic               string   `flag:"src-topic"`
-	SrcLookupdTCPAddresses []string `flag:"src-lookupd-tcp-addresses"`
-	SrcNSQDTCPAddresses    []string `flag:"src-nsqd-tcp-addresses"`
-	SrcChannel             string   `flag:"src-channel"`
-	SrcBootstrapServers    []string `flag:"src-bootstrap-servers"`
-	SrcGroup               string   `flag:"src-group"`
-	SrcSpeed               int64    `flag:"src-speed"`
-	SrcFile                string   `flag:"src-file"`
-	SrcScannerBufSizeMb    int      `flag:"src-scanner-buf-size-mb"`
+	Src                     string   `flag:"src"` // nsq / kafka / press
+	SrcTopic                string   `flag:"src-topic"`
+	SrcLookupdHTTPAddresses []string `flag:"src-lookupd-http-addresses"`
+	SrcNSQDTCPAddresses     []string `flag:"src-nsqd-tcp-addresses"`
+	SrcChannel              string   `flag:"src-channel"`
+	SrcBootstrapServers     []string `flag:"src-bootstrap-servers"`
+	SrcGroup                string   `flag:"src-group"`
+	SrcSpeed                int64    `flag:"src-speed"`
+	SrcFile                 string   `flag:"src-file"`
+	SrcScannerBufSizeMb     int      `flag:"src-scanner-buf-size-mb"`
 
 	ChanSize int `flag:"chan-size"`
 
-	Dst                    string   `flag:"dst"` // nsq / kafka
-	DstLookupdTCPAddresses []string `flag:"dst-lookupd-tcp-address"`
-	DstNSQDTCPAddresses    []string `flag:"dst-nsqd-tcp-address"`
-	DstBootstrapServers    []string `flag:"dst-bootstrap-servers"`
-	DstTopic               string   `flag:"dst-topic"`
-	DstFile                string   `flag:"dst-file"`
-	DstBufSizeByte         int      `flag:"dst-buf-size-byte"`
+	Dst                     string   `flag:"dst"` // nsq / kafka
+	DstLookupdHTTPAddresses []string `flag:"dst-lookupd-http-address"`
+	DstNSQDTCPAddresses     []string `flag:"dst-nsqd-tcp-address"`
+	DstBootstrapServers     []string `flag:"dst-bootstrap-servers"`
+	DstTopic                string   `flag:"dst-topic"`
+	DstFile                 string   `flag:"dst-file"`
+	DstBufSizeByte          int      `flag:"dst-buf-size-byte"`
 }
 
 func (o *Options) Json() ([]byte, error) {
@@ -45,18 +45,18 @@ func NewOptions(app string) *Options {
 		LogPrefix: logPrefix,
 		LogLevel:  "info",
 
-		SrcLookupdTCPAddresses: make([]string, 0),
-		SrcNSQDTCPAddresses:    make([]string, 0),
-		SrcBootstrapServers:    make([]string, 0),
-		SrcSpeed:               10,
-		SrcScannerBufSizeMb:    1,
+		SrcLookupdHTTPAddresses: make([]string, 0),
+		SrcNSQDTCPAddresses:     make([]string, 0),
+		SrcBootstrapServers:     make([]string, 0),
+		SrcSpeed:                10,
+		SrcScannerBufSizeMb:     1,
 
 		ChanSize: 100,
 
-		DstLookupdTCPAddresses: make([]string, 0),
-		DstNSQDTCPAddresses:    make([]string, 0),
-		DstBootstrapServers:    make([]string, 0),
-		DstBufSizeByte:         4096,
+		DstLookupdHTTPAddresses: make([]string, 0),
+		DstNSQDTCPAddresses:     make([]string, 0),
+		DstBootstrapServers:     make([]string, 0),
+		DstBufSizeByte:          4096,
 	}
 	opts.loadEnv()
 	return opts
@@ -75,11 +75,11 @@ func FlagSet(opts *Options) *flag.FlagSet {
 
 	flagSet.StringVar(&opts.SrcTopic, "src-topic", opts.SrcTopic, "source topic of nsq or kafka")
 
-	flagSet.Func("src-lookupd-tcp-addresses", "<addr>:<port>[,<addr>:<port>] to connect for source of nsq client", func(s string) error {
+	flagSet.Func("src-lookupd-http-addresses", "<addr>:<port>[,<addr>:<port>] to connect for source of nsq client", func(s string) error {
 		if s == "" {
 			return nil
 		}
-		opts.SrcLookupdTCPAddresses = strings.Split(s, ",")
+		opts.SrcLookupdHTTPAddresses = strings.Split(s, ",")
 		return nil
 	})
 	flagSet.Func("src-nsqd-tcp-addresses", "<addr>:<port>[,<addr>:<port>] to connect for source of nsq client", func(s string) error {
@@ -110,11 +110,11 @@ func FlagSet(opts *Options) *flag.FlagSet {
 
 	flagSet.StringVar(&opts.DstTopic, "dst-topic", opts.DstTopic, "destination topic of nsq or kafka")
 
-	flagSet.Func("dst-lookupd-tcp-addresses", "<addr>:<port>[,<addr>:<port>] to connect for sink of nsq client", func(s string) error {
+	flagSet.Func("dst-lookupd-http-addresses", "<addr>:<port>[,<addr>:<port>] to connect for sink of nsq client", func(s string) error {
 		if s == "" {
 			return nil
 		}
-		opts.DstLookupdTCPAddresses = strings.Split(s, ",")
+		opts.DstLookupdHTTPAddresses = strings.Split(s, ",")
 		return nil
 	})
 	flagSet.Func("dst-nsqd-tcp-addresses", "<addr>:<port>[,<addr>:<port>] to connect for sink of nsq client", func(s string) error {

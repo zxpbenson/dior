@@ -59,8 +59,8 @@ func (o *Options) validateSrcKafka() error {
 }
 
 func (o *Options) validateSrcNSQ() error {
-	if len(o.SrcLookupdTCPAddresses) == 0 && len(o.SrcNSQDTCPAddresses) == 0 {
-		return errors.New("param [src-lookupd-tcp-addresses] or [src-nsqd-tcp-addresses] : required")
+	if len(o.SrcLookupdHTTPAddresses) == 0 && len(o.SrcNSQDTCPAddresses) == 0 {
+		return errors.New("param [src-lookupd-http-addresses] or [src-nsqd-tcp-addresses] : required")
 	}
 	if o.SrcChannel == "" {
 		return errors.New("param [src-channel] : required")
@@ -132,8 +132,8 @@ func (o *Options) validateDstKafka() error {
 }
 
 func (o *Options) validateDstNSQ() error {
-	if len(o.DstLookupdTCPAddresses) == 0 && len(o.DstNSQDTCPAddresses) == 0 {
-		return errors.New("param [dst-lookupd-tcp-addresses] or [dst-nsqd-tcp-addresses] : required")
+	if len(o.DstLookupdHTTPAddresses) == 0 && len(o.DstNSQDTCPAddresses) == 0 {
+		return errors.New("param [dst-lookupd-http-addresses] or [dst-nsqd-tcp-addresses] : required")
 	}
 	if o.DstTopic == "" {
 		return errors.New("param [dst-topic] : required")

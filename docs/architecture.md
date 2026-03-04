@@ -91,8 +91,8 @@ classDiagram
     class NSQSource {
         *component.Asynchronizer
         -consumer *nsq.Consumer
-        -nsqds []string
-        -nsqLookupds []string
+        -nsqdTCPAddresses []string
+        -lookupdHTTPAddresses []string
         -topic string
         -channel string
         +Init(channel chan []byte) error
@@ -150,13 +150,15 @@ classDiagram
         -producers []*nsq.Producer
         -topic string
         -nsqdTCPAddresses []string
+        -lookupdHTTPAddresses []string
         -nsqdLen int
         -nsqdIndex atomic.Int64
         +Init(channel chan []byte) error
         +Start(ctx context.Context)
         +Stop()
+        -lookupdNSQDNodes() ([]string, error)
         -output(data []byte) error
-        Note: Implements round-robin load balancing across multiple NSQD instances
+        Note: Implements round-robin load balancing across multiple NSQD instances, supports nsqlookupd discovery
     }
     
     class nilSink {
