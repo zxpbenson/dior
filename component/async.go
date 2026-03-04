@@ -104,7 +104,7 @@ func (a *Asynchronizer) GetStats() (processed, errors int64) {
 // 打印统计信息
 func (a *Asynchronizer) ShowStats() {
 	lg.DftLgr.Info("Asynchronizer.work show component %s stats : state=%s, processed=%d, errors=%d",
-		a.name, a.state.Load(), a.processedCount.Load(), a.errorCount.Load())
+		a.name, ComponentState(a.state.Load()), a.processedCount.Load(), a.errorCount.Load())
 }
 
 // work 是Sink组件的核心工作循环
