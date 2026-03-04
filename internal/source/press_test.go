@@ -37,7 +37,7 @@ func TestPressSource_Lifecycle(t *testing.T) {
 	}
 
 	// Create Source
-	srcCmp, err := newPressSource(opts)
+	srcCmp, err := newPressSource("press-source", opts)
 	if err != nil {
 		t.Fatalf("Failed to create press source: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestPressSource_Lifecycle(t *testing.T) {
 	// We expect 3 lines
 	expectedLines := 3
 	receivedCount := 0
-	
+
 	timer := time.NewTimer(2 * time.Second)
 	defer timer.Stop()
 
@@ -111,7 +111,7 @@ LOOP:
 	case <-time.After(time.Second):
 		t.Error("timeout waiting for source to stop")
 	}
-	
+
 	// Close channel after source has stopped writing
 	close(dataCh)
 }

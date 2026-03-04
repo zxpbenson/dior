@@ -30,7 +30,7 @@ func TestFileSink_Lifecycle(t *testing.T) {
 	}
 
 	// Create Sink
-	sinkCmp, err := newFileSink(opts)
+	sinkCmp, err := newFileSink("file-sink", opts)
 	if err != nil {
 		t.Fatalf("Failed to create file sink: %v", err)
 	}
@@ -65,10 +65,10 @@ func TestFileSink_Lifecycle(t *testing.T) {
 	// Simulate graceful shutdown sequence:
 	// 1. Cancel context
 	cancel()
-	
+
 	// 2. Close channel (this tells Asynchronizer to finish up and exit its loop)
 	close(dataCh)
-	
+
 	// 3. Wait for Asynchronizer goroutine to finish reading remaining data
 	done := make(chan struct{})
 	go func() {

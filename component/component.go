@@ -16,7 +16,7 @@ type Component interface {
 	Stop()
 }
 
-type OutputFunc func(data []byte)
+type OutputFunc func(data []byte) error
 
 type ComponentCreator func(name string, options *option.Options) (Component, error)
 

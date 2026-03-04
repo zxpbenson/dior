@@ -6,6 +6,7 @@ import (
 	"dior/component"
 	"dior/internal/lg"
 	"dior/option"
+	"fmt"
 	"os"
 	"sync/atomic"
 )
@@ -46,7 +47,7 @@ func (s *fileSink) Init(channel chan []byte) (err error) {
 	return
 }
 
-func (s *fileSink) output(data []byte) {
+func (s *fileSink) output(data []byte) error {
 	if lg.DftLgr.Enable(lg.DEBUG) {
 		lg.DftLgr.Debug("FileSink.output data: %v", string(data))
 	}
@@ -54,24 +55,23 @@ func (s *fileSink) output(data []byte) {
 	// 写入数据
 	n, err := s.writer.Write(data)
 	if err != nil {
-		lg.DftLgr.Error("FileSink.output write data error: %v", err)
-		return
+		return fmt.Errorf("FileSink.output write data error: %v", err)
 	}
 	lg.DftLgr.Debug("FileSink.output write file %s byte count: %v", s.fileName, n)
 
 	// 写入分隔符
 	n, err = s.writer.Write(s.splitter)
 	if err != nil {
-		lg.DftLgr.Error("FileSink.output write separator error: %v", err)
-		return
+		return fmt.Errorf("FileSink.output write separator error: %v", err)
 	}
 
 	// 每写入100条数据刷新一次缓冲区，避免内存占用过高
 	if s.processedCount.Add(1)%100 == 0 {
 		if err := s.writer.Flush(); err != nil {
-			lg.DftLgr.Error("FileSink.output flush error: %v", err)
+			return fmt.Errorf("FileSink.output flush error: %v", err)
 		}
 	}
+	return nil
 }
 
 func (s *fileSink) Start(ctx context.Context) {

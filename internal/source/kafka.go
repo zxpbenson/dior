@@ -3,7 +3,6 @@ package source
 import (
 	"context"
 	"dior/component"
-	"dior/internal/kafka"
 	"dior/internal/lg"
 	"dior/option"
 	"errors"
@@ -15,14 +14,10 @@ import (
 type KafkaSource struct {
 	*component.Asynchronizer
 
-	consumer              *kafka.Consumer      // init in source.newKafkaSource
 	client                sarama.ConsumerGroup // init in source.KafkaSource.Init
 	kafkaBootstrapServers []string             // init in source.newKafkaSource
 	topic                 string               // init in source.newKafkaSource
 	group                 string               // init in source.newKafkaSource
-
-	// cancel 用于取消消费循环，不保存context
-	cancel context.CancelFunc // init in source.KafkaSource.Start
 }
 
 func init() {
@@ -32,7 +27,6 @@ func init() {
 func newKafkaSource(name string, opts *option.Options) (component.Component, error) {
 	return &KafkaSource{
 		Asynchronizer:         component.NewAsynchronizer(name),
-		consumer:              &kafka.Consumer{},
 		kafkaBootstrapServers: opts.SrcBootstrapServers,
 		topic:                 opts.SrcTopic,
 		group:                 opts.SrcGroup,
@@ -63,14 +57,8 @@ func (s *KafkaSource) Init(channel chan []byte) (err error) {
 }
 
 func (s *KafkaSource) Start(ctx context.Context) {
-	// 创建可取消的子上下文
-	// 注意：cancel保存在结构体中是因为Stop()需要调用它来取消消费循环
-	// 这是Go官方允许的模式：保存cancel但不保存context
-	ctx, s.cancel = context.WithCancel(ctx)
-
 	s.Add(1)
 	s.Asynchronizer.SetState(component.CompStateRunning)
-	s.consumer.Prepare(s.consume)
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
@@ -90,7 +78,7 @@ func (s *KafkaSource) Start(ctx context.Context) {
 			// `Consume` should be called inside an infinite loop, when a
 			// server-side rebalance happens, the consumer session will need to be
 			// recreated to get the new claims
-			if err := s.client.Consume(ctx, []string{s.topic}, s.consumer); err != nil {
+			if err := s.client.Consume(ctx, []string{s.topic}, s); err != nil {
 				if errors.Is(err, sarama.ErrClosedConsumerGroup) {
 					lg.DftLgr.Info("KafkaSource.Start consumer group closed normally")
 					return
@@ -129,14 +117,11 @@ func (s *KafkaSource) Start(ctx context.Context) {
 				lg.DftLgr.Info("KafkaSource.Start context cancelled, exiting")
 				return
 			}
-			s.consumer.ResetReady()
 		}
 	}()
 }
 
 func (s *KafkaSource) Stop() {
-	s.cancel()
-
 	if err := s.client.Close(); err != nil {
 		lg.DftLgr.Warn("KafkaSource.Stop Error closing client: %v", err)
 	}
@@ -144,14 +129,52 @@ func (s *KafkaSource) Stop() {
 	lg.DftLgr.Info("KafkaSource.Stop done.")
 }
 
-func (s *KafkaSource) consume(msg *sarama.ConsumerMessage) {
-	// 使用select防止channel满时阻塞
-	select {
-	case s.Channel <- msg.Value:
-		// 发送成功
-	default:
-		// channel已满，记录警告并丢弃消息
-		lg.DftLgr.Warn("KafkaSource.consume channel full, dropping message (topic: %s, partition: %d, offset: %d)",
-			msg.Topic, msg.Partition, msg.Offset)
+// Setup is run at the beginning of a new session, before ConsumeClaim
+func (s *KafkaSource) Setup(sarama.ConsumerGroupSession) error {
+	lg.DftLgr.Warn("KafkaSource.Setup done.")
+	return nil
+}
+
+// Cleanup is run at the end of a session, once all ConsumeClaim goroutines have exited
+func (s *KafkaSource) Cleanup(sarama.ConsumerGroupSession) error {
+	lg.DftLgr.Warn("KafkaSource.Cleanup done.")
+	return nil
+}
+
+// ConsumeClaim must start a consumer loop of ConsumerGroupClaim's Messages().
+// Once the Messages() channel is closed, the Handler must finish its processing
+// loop and exit.
+func (s *KafkaSource) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+	// NOTE:
+	// Do not move the code below to a goroutine.
+	// The `ConsumeClaim` itself is called within a goroutine, see:
+	// https://github.com/IBM/sarama/blob/main/consumer_group.go#L27-L29
+	for {
+		select {
+		case message, ok := <-claim.Messages():
+			if !ok {
+				lg.DftLgr.Warn("message channel was closed")
+				return nil
+			}
+			if lg.DftLgr.Enable(lg.DEBUG) {
+				lg.DftLgr.Debug("KafkaSource.ConsumeClaim Message claimed: value = %s, timestamp = %v, topic = %s", string(message.Value), message.Timestamp, message.Topic)
+			}
+			// 只有在消息成功发送到 channel 时才提交偏移量
+			select {
+			case s.Channel <- message.Value:
+				session.MarkMessage(message, "")
+				s.Asynchronizer.AddProcessedCount(1)
+			default:
+				// channel已满，记录警告但不提交偏移量，Kafka会重新投递
+				lg.DftLgr.Warn("KafkaSource.consume channel full, message will be redelivered (topic: %s, partition: %d, offset: %d)",
+					message.Topic, message.Partition, message.Offset)
+			}
+		// Should return when `session.Context()` is done.
+		// If not, will raise `ErrRebalanceInProgress` or `read tcp <ip>:<port>: i/o timeout` when kafka rebalance. see:
+		// https://github.com/IBM/sarama/issues/1192
+		case <-session.Context().Done():
+			lg.DftLgr.Warn("KafkaSource.ConsumeClaim session.Context().Done()")
+			return nil
+		}
 	}
 }

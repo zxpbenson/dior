@@ -27,8 +27,9 @@ func (s *nilSink) Init(channel chan []byte) (err error) {
 	return nil
 }
 
-func (s *nilSink) output(data []byte) {
+func (s *nilSink) output(data []byte) error {
 	lg.DftLgr.Debug("NilSink.output data : %v", data)
+	return nil
 }
 
 func (s *nilSink) Start(ctx context.Context) {

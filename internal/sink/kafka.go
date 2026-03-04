@@ -5,6 +5,7 @@ import (
 	"dior/component"
 	"dior/internal/lg"
 	"dior/option"
+	"fmt"
 	"github.com/IBM/sarama"
 	"time"
 )
@@ -47,7 +48,7 @@ func (s *kafkaSink) Init(channel chan []byte) (err error) {
 	return nil
 }
 
-func (s *kafkaSink) produce(data []byte) {
+func (s *kafkaSink) produce(data []byte) error {
 	// 构造一个消息
 	msg := &sarama.ProducerMessage{}
 	msg.Topic = s.topic
@@ -61,7 +62,7 @@ func (s *kafkaSink) produce(data []byte) {
 		partitionId, offset, err := s.producer.SendMessage(msg)
 		if err == nil {
 			lg.DftLgr.Debug("kafkaSink.produce send msg ok, pid: %v offset: %v", partitionId, offset)
-			return
+			return nil
 		}
 
 		lastErr = err
@@ -74,7 +75,7 @@ func (s *kafkaSink) produce(data []byte) {
 	}
 
 	// 所有重试都失败
-	lg.DftLgr.Error("kafkaSink.produce send msg failed after %d attempts, last error: %v", maxRetries, lastErr)
+	return fmt.Errorf("kafkaSink.produce send msg failed after %d attempts, last error: %v", maxRetries, lastErr)
 }
 
 func (s *kafkaSink) Start(ctx context.Context) {

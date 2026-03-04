@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 // ComponentState 组件运行状态
@@ -89,6 +88,14 @@ func (a *Asynchronizer) SetState(state ComponentState) {
 	a.state.Store(int32(state))
 }
 
+func (a *Asynchronizer) AddProcessedCount(delta int64) {
+	a.processedCount.Add(delta)
+}
+
+func (a *Asynchronizer) AddErrorCount(delta int64) {
+	a.errorCount.Add(delta)
+}
+
 // GetStats 获取统计信息
 func (a *Asynchronizer) GetStats() (processed, errors int64) {
 	return a.processedCount.Load(), a.errorCount.Load()
@@ -105,8 +112,8 @@ func (a *Asynchronizer) ShowStats() {
 // - 不主动监听ctx.Done()，确保能排空channel中的剩余数据
 // - 通过channel关闭来触发正常退出
 // - 通过panic恢复来处理异常
+// 注意：调用方需在启动goroutine前调用Add(1)，避免与Wait()产生竞争
 func (a *Asynchronizer) work(ctx context.Context) {
-	a.control.Add(1)
 	a.SetState(CompStateRunning)
 	defer func() {
 		if err := recover(); err != nil {
@@ -150,8 +157,11 @@ func (a *Asynchronizer) processData(data []byte) {
 	}()
 
 	if a.Output != nil {
-		a.Output(data)
-		a.processedCount.Add(1)
+		if err := a.Output(data); err == nil {
+			a.processedCount.Add(1)
+		} else {
+			panic(err)
+		}
 	}
 }
 
@@ -176,6 +186,7 @@ func (a *Asynchronizer) drainChannel() {
 // Start 启动异步处理goroutine
 // 注意：具体组件可以自行定制Start的行为
 func (a *Asynchronizer) Start(ctx context.Context) {
+	a.control.Add(1) // 在启动goroutine前调用Add，避免与Wait()产生竞争
 	go a.work(ctx)
 	lg.DftLgr.Info("Asynchronizer.Start done, state=%s", a.GetState())
 }
@@ -185,19 +196,6 @@ func (a *Asynchronizer) Start(ctx context.Context) {
 func (a *Asynchronizer) Stop() {
 	a.SetState(CompStateStopping)
 	lg.DftLgr.Info("Asynchronizer.Stop called, state=%s", a.GetState())
-}
-
-// WaitForStop 等待组件完全停止（带超时）
-// 此方法暂时用不到
-func (a *Asynchronizer) WaitForStop(timeout time.Duration) bool {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if a.GetState() == CompStateStopped {
-			return true
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	return false
 }
 
 // Add 增加WaitGroup计数

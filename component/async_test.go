@@ -19,8 +19,9 @@ func TestAsynchronizer_Work(t *testing.T) {
 
 	async := &Asynchronizer{
 		Channel: dataCh,
-		Output: func(data []byte) {
+		Output: func(data []byte) error {
 			resultCh <- data
+			return nil
 		},
 	}
 	async.UnderControl(wg)
@@ -45,11 +46,11 @@ func TestAsynchronizer_Work(t *testing.T) {
 
 	// Test cancellation
 	cancel()
-	
+
 	// In the new graceful shutdown model, the source stops and then the channel is closed.
 	// Asynchronizer relies on channel closure to exit.
 	close(dataCh)
-	
+
 	// Wait for goroutine to finish (with timeout)
 	done := make(chan struct{})
 	go func() {
@@ -68,11 +69,12 @@ func TestAsynchronizer_Work(t *testing.T) {
 func TestAsynchronizer_ChannelClose(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	dataCh := make(chan []byte, 10)
-	
+
 	async := &Asynchronizer{
 		Channel: dataCh,
-		Output: func(data []byte) {
+		Output: func(data []byte) error {
 			// Do nothing
+			return nil
 		},
 	}
 	async.UnderControl(wg)
@@ -107,8 +109,9 @@ func BenchmarkAsynchronizer_Work(b *testing.B) {
 
 	async := &Asynchronizer{
 		Channel: dataCh,
-		Output: func(data []byte) {
+		Output: func(data []byte) error {
 			// No-op for benchmark
+			return nil
 		},
 	}
 	async.UnderControl(wg)

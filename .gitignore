@@ -5,3 +5,5 @@ build/*
 *.logs
 *data.txt
 tmp*
+source.txt
+sink.txt

@@ -5,6 +5,7 @@ import (
 	"dior/component"
 	"dior/internal/lg"
 	"dior/option"
+	"fmt"
 	"sync/atomic"
 
 	"github.com/nsqio/go-nsq"
@@ -49,18 +50,18 @@ func (s *nsqSink) Init(channel chan []byte) (err error) {
 	return nil
 }
 
-func (s *nsqSink) output(data []byte) {
+func (s *nsqSink) output(data []byte) error {
 	// 轮询选择producer（原子操作保证并发安全）
 	index := s.nsqdIndex.Add(1) - 1
 	producer := s.producers[index%int64(s.nsqdLen)]
 
 	// 发送消息
 	err := producer.Publish(s.topic, data)
-	if err != nil {
-		lg.DftLgr.Error("nsqSink.output publish failed, topic: %s, error: %v", s.topic, err)
-		return
+	if err == nil {
+		lg.DftLgr.Debug("nsqSink.output publish ok, topic: %s", s.topic)
+		return nil
 	}
-	lg.DftLgr.Debug("nsqSink.output publish ok, topic: %s", s.topic)
+	return fmt.Errorf("nsqSink.output publish failed, topic: %s, error: %v", s.topic, err)
 }
 
 func (s *nsqSink) Start(ctx context.Context) {
