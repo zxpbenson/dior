@@ -30,8 +30,6 @@ dior/
 │   ├── dior/                # Main application entry point
 │   │   ├── main.go          # Main program
 │   │   └── main_test.go     # Main program tests
-│   ├── kafka-consumer/      # Kafka consumer utility (standalone)
-│   │   └── main.go
 │   └── some/                # Other utility
 │       └── main.go
 ├── component/               # Core component interfaces
@@ -101,12 +99,26 @@ Dior supports cross-compilation to different platforms and architectures. The Ma
 | macOS ARM64 | `make GOOS=darwin GOARCH=arm64` |
 | macOS AMD64 | `make GOOS=darwin GOARCH=amd64` |
 
+**注意**：为了确保交叉编译正常工作，请确保在命令行中直接设置环境变量，而不是在 Makefile 中修改。Makefile 会自动检测并应用这些环境变量。
+
 The build system automatically adds `.exe` extension for Windows targets.
 
 To see the current build configuration, use:
 
 ```bash
 make show-config
+```
+
+**示例**：
+```bash
+# 编译 Linux AMD64 版本
+make GOOS=linux GOARCH=amd64
+
+# 编译 Windows AMD64 版本
+make GOOS=windows GOARCH=amd64
+
+# 编译 macOS ARM64 版本
+make GOOS=darwin GOARCH=arm64
 ```
 
 ## Configuration

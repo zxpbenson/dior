@@ -49,42 +49,42 @@ ifeq ($(GOARCH),)
   endif
 endif
 
-BLDFLAGS = CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH)
+BLDFLAGS = CGO_ENABLED=0
 EXT=
 ifeq ($(GOOS),windows)
     EXT=.exe
 endif
 
+APPS = dior some
+
+# 默认目标
+all: $(APPS)
+
 # 用于调试：显示当前编译配置
-.PHONY: show-config
 show-config:
 	@echo "GOOS: $(GOOS)"
 	@echo "GOARCH: $(GOARCH)"
 	@echo "BLDFLAGS: $(BLDFLAGS)"
 	@echo "EXT: $(EXT)"
 
-APPS = dior some kafka-consumer
-all: $(APPS)
+# 构建目标，Windows 平台直接生成 .exe 文件
+$(BLDDIR)/dior$(EXT):           $(wildcard cmd/dior/*.go internal/cache/*.go internal/lg/*.go option/*.go internal/source/*.go internal/sink/*.go component/*.go internal/version/*.go)
+$(BLDDIR)/some$(EXT):           $(wildcard cmd/some/*.go internal/cache/*.go internal/lg/*.go option/*.go internal/source/*.go internal/sink/*.go component/*.go internal/version/*.go)
 
-$(BLDDIR)/dior:           $(wildcard cmd/dior/*.go internal/cache/*.go internal/lg/*.go option/*.go internal/source/*.go internal/sink/*.go component/*.go internal/version/*.go)
-$(BLDDIR)/some:           $(wildcard cmd/some/*.go internal/cache/*.go internal/lg/*.go option/*.go internal/source/*.go internal/sink/*.go component/*.go internal/version/*.go)
-$(BLDDIR)/kafka-consumer: $(wildcard cmd/kafka-consumer/*.go internal/cache/*.go internal/lg/*.go option/*.go internal/source/*.go internal/sink/*.go component/*.go internal/version/*.go)
-
-$(BLDDIR)/%:
+$(BLDDIR)/%$(EXT):
 	@mkdir -p $(dir $@)
-	$(BLDFLAGS) go build -o $@ ./cmd/$*
+	env GOOS=$(GOOS) GOARCH=$(GOARCH) $(BLDFLAGS) go build -o $@ ./cmd/$*
 
-$(APPS): %: $(BLDDIR)/%
-
-clean:
-	rm -fr $(BLDDIR)
-
-.PHONY: install clean all test show-config
-.PHONY: $(APPS)
+$(APPS): %: $(BLDDIR)/%$(EXT)
 
 test:
 	go test -v -race -cover ./...
 
+clean:
+	rm -fr $(BLDDIR)
+
 install: $(APPS)
 	install -m 755 -d ${DESTDIR}${BINDIR}
-	for APP in $^ ; do install -m 755 ${BLDDIR}/$$APP ${DESTDIR}${BINDIR}/$$APP${EXT} ; done
+	for APP in $^ ; do install -m 755 ${BLDDIR}/$$APP$(EXT) ${DESTDIR}${BINDIR}/$$APP$(EXT) ; done
+
+.PHONY: all install clean test show-config $(APPS)

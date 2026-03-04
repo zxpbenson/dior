@@ -1,4 +1,4 @@
-# Dior Architecture Documentation
+也去# Dior Architecture Documentation
 
 ## Project Overview
 
@@ -341,8 +341,6 @@ flowchart TB
 dior/
 ├── cmd/
 │   ├── dior/           # Main application entry point
-│   │   └── main.go
-│   ├── kafka-consumer/ # Kafka consumer utility
 │   │   └── main.go
 │   └── some/           # Other utilities
 │       └── main.go
