@@ -1,4 +1,4 @@
-也去# Dior Architecture Documentation
+# Dior Architecture Documentation
 
 ## Project Overview
 
