@@ -41,6 +41,7 @@ func (s *PressSource) Init(channel chan []byte) error {
 }
 
 func (s *PressSource) Start(ctx context.Context) {
+	s.Asynchronizer.SetState(component.CompStateRunning)
 	// 自定义Start实现，没有使用 component.Asynchronizer 默认实现
 	go s.doSend(ctx)
 	go s.doCmd(ctx)
@@ -48,14 +49,13 @@ func (s *PressSource) Start(ctx context.Context) {
 
 func (s *PressSource) doCmd(ctx context.Context) {
 	s.Add(1)
-	s.Asynchronizer.SetState(component.CompStateRunning)
 	defer func() {
 		if err := recover(); err != nil {
 			lg.DftLgr.Error("PressSource.doCmd recover error : %v", err)
 		}
-		s.Asynchronizer.SetState(component.CompStateStopped)
-		s.Done()
+		s.Asynchronizer.SetState(component.CompStateStopping)
 		s.Asynchronizer.ShowStats()
+		s.Done()
 	}()
 
 	ticker := time.NewTicker(time.Second)
@@ -133,6 +133,7 @@ func (s *PressSource) writeLoop(ctx context.Context, limit int64, ticket *cache.
 		select {
 		case s.Channel <- data:
 			count = cnt
+			s.Asynchronizer.AddProcessedCount(1)
 		case <-ctx.Done():
 			lg.DftLgr.Warn("PressSource.writeLoop context cancelled, stopping at count %d", count)
 			return count, nil
@@ -148,5 +149,5 @@ func (s *PressSource) writeLoop(ctx context.Context, limit int64, ticket *cache.
 
 func (s *PressSource) Stop() {
 	s.Asynchronizer.Stop()
-	lg.DftLgr.Info("PressSource.Stop called, goroutines will exit via context cancellation")
+	lg.DftLgr.Info("PressSource.Stop called")
 }

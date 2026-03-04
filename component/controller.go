@@ -129,12 +129,12 @@ func (c *Controller) addIO(source Component, channel chan []byte, sink Component
 func (c *Controller) Init() error {
 	// 先初始化Sink，确保消费者就绪
 	if err := c.sink.Init(c.channel); err != nil {
-		return fmt.Errorf("Controller init sink fail: %w", err)
+		return fmt.Errorf("controller init sink fail: %w", err)
 	}
 
 	// 再初始化Source
 	if err := c.source.Init(c.channel); err != nil {
-		return fmt.Errorf("Controller init source fail: %w", err)
+		return fmt.Errorf("controller init source fail: %w", err)
 	}
 	return nil
 }
@@ -182,31 +182,15 @@ func (c *Controller) gracefulShutdown() {
 	c.setState(StateStopping)
 
 	// 创建超时上下文，防止停止流程卡住
+	// 在goroutine中执行source.Stop()，支持超时
 	ctx, cancel := context.WithTimeout(context.Background(), c.stopTimeout)
 	defer cancel()
 
 	// ====== Phase 1: 停止Source ======
-	lg.DftLgr.Warn("Controller phase 1: stopping source...")
-
 	// 发送取消信号
 	c.cancel()
+	lg.DftLgr.Warn("Controller phase 1: trigger global cancellation and waiting for source goroutines...")
 
-	// 在goroutine中执行source.Stop()，支持超时
-	sourceStopDone := make(chan struct{})
-	go func() {
-		defer close(sourceStopDone)
-		c.source.Stop()
-	}()
-
-	select {
-	case <-sourceStopDone:
-		lg.DftLgr.Info("Controller source.Stop() completed")
-	case <-ctx.Done():
-		lg.DftLgr.Warn("Controller source.Stop() timeout, proceeding anyway")
-	}
-
-	// ====== Phase 2: 等待Source完全停止 ======
-	lg.DftLgr.Warn("Controller phase 2: waiting for source goroutines...")
 	sourceWaitDone := make(chan struct{})
 	go func() {
 		defer close(sourceWaitDone)
@@ -218,6 +202,21 @@ func (c *Controller) gracefulShutdown() {
 		lg.DftLgr.Info("Controller source goroutines stopped")
 	case <-ctx.Done():
 		lg.DftLgr.Warn("Controller wait for source timeout, proceeding anyway")
+	}
+
+	// ====== Phase 2: 等待Source完全停止 ======
+	lg.DftLgr.Warn("Controller phase 2: stopping source...")
+	sourceStopDone := make(chan struct{})
+	go func() {
+		defer close(sourceStopDone)
+		c.source.Stop()
+	}()
+
+	select {
+	case <-sourceStopDone:
+		lg.DftLgr.Info("Controller source.Stop() completed")
+	case <-ctx.Done():
+		lg.DftLgr.Warn("Controller source.Stop() timeout, proceeding anyway")
 	}
 
 	// ====== Phase 3: 关闭Channel ======
@@ -263,6 +262,7 @@ func (c *Controller) gracefulShutdown() {
 // 此方法暂时用不到
 func (c *Controller) Stop() {
 	if c.GetState() != StateRunning {
+		lg.DftLgr.Warn("Controller state shutdown %i", c.GetState())
 		return
 	}
 

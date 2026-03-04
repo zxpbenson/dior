@@ -36,6 +36,7 @@ func newNSQSource(name string, opts *option.Options) (component.Component, error
 func (s *NSQSource) Init(channel chan []byte) (err error) {
 	s.Asynchronizer.Init(channel)
 	config := nsq.NewConfig()
+	config.MaxInFlight = 5 // 设置最大并发处理数量（控制消费速度）
 	s.consumer, err = nsq.NewConsumer(s.topic, s.channel, config)
 	if err != nil {
 		return err
@@ -59,7 +60,8 @@ func (s *NSQSource) handlerFunc(message *nsq.Message) error {
 }
 
 func (s *NSQSource) Start(ctx context.Context) {
-	// 修复：移除多余的return，确保后续代码执行
+	s.Asynchronizer.SetState(component.CompStateRunning)
+
 	if len(s.nsqds) > 0 {
 		err := s.consumer.ConnectToNSQDs(s.nsqds)
 		if err != nil {
@@ -75,11 +77,33 @@ func (s *NSQSource) Start(ctx context.Context) {
 		return
 	}
 
-	// 启动异步处理
-	s.Asynchronizer.Start(ctx)
+	go s.closeWait(ctx)
+}
+
+func (s *NSQSource) closeWait(ctx context.Context) {
+	s.Add(1)
+	defer func() {
+		if err := recover(); err != nil {
+			lg.DftLgr.Error("NSQSource.closeWait recover error : %v", err)
+		}
+		s.Asynchronizer.SetState(component.CompStateStopping)
+		s.Asynchronizer.ShowStats()
+		s.Done()
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			lg.DftLgr.Warn("NSQSource.Start receive quit cmd")
+			s.consumer.Stop()
+			lg.DftLgr.Warn("NSQSource.Start stop nsq consumer")
+			<-s.consumer.StopChan // 阻塞等待 NSQ 消费者完全停止，确保不再写入 Channel
+			lg.DftLgr.Warn("NSQSource.Start all nsq consumer routine stopped")
+			return
+		}
+	}
 }
 
 func (s *NSQSource) Stop() {
-	<-s.consumer.StopChan // 阻塞等待 NSQ 消费者完全停止，确保不再写入 Channel
-	s.consumer.Stop()
+	s.Asynchronizer.Stop()
 }

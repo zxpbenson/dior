@@ -64,9 +64,9 @@ func (s *KafkaSource) Start(ctx context.Context) {
 			if err := recover(); err != nil {
 				lg.DftLgr.Error("KafkaSource.Start panic recovered: %v", err)
 			}
-			s.Asynchronizer.SetState(component.CompStateStopped)
+			s.Asynchronizer.SetState(component.CompStateStopping)
+			s.Asynchronizer.ShowStats()
 			s.Done()
-			lg.DftLgr.Info("KafkaSource.Start goroutine exited")
 		}()
 
 		backoff := time.Second

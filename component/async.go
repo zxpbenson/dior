@@ -103,8 +103,8 @@ func (a *Asynchronizer) GetStats() (processed, errors int64) {
 
 // 打印统计信息
 func (a *Asynchronizer) ShowStats() {
-	lg.DftLgr.Info("Asynchronizer.work stopped for %s, processed=%d, errors=%d",
-		a.name, a.processedCount.Load(), a.errorCount.Load())
+	lg.DftLgr.Info("Asynchronizer.work show component %s stats : state=%s, processed=%d, errors=%d",
+		a.name, a.state.Load(), a.processedCount.Load(), a.errorCount.Load())
 }
 
 // work 是Sink组件的核心工作循环
@@ -114,7 +114,6 @@ func (a *Asynchronizer) ShowStats() {
 // - 通过panic恢复来处理异常
 // 注意：调用方需在启动goroutine前调用Add(1)，避免与Wait()产生竞争
 func (a *Asynchronizer) work(ctx context.Context) {
-	a.SetState(CompStateRunning)
 	defer func() {
 		if err := recover(); err != nil {
 			lg.DftLgr.Error("Asynchronizer.work panic recovered: %v", err)
@@ -123,7 +122,7 @@ func (a *Asynchronizer) work(ctx context.Context) {
 				a.onError(fmt.Errorf("panic: %v", err))
 			}
 		}
-		a.SetState(CompStateStopped)
+		a.SetState(CompStateStopping)
 		a.control.Done()
 		a.ShowStats()
 	}()
@@ -186,6 +185,7 @@ func (a *Asynchronizer) drainChannel() {
 // Start 启动异步处理goroutine
 // 注意：具体组件可以自行定制Start的行为
 func (a *Asynchronizer) Start(ctx context.Context) {
+	a.SetState(CompStateRunning)
 	a.control.Add(1) // 在启动goroutine前调用Add，避免与Wait()产生竞争
 	go a.work(ctx)
 	lg.DftLgr.Info("Asynchronizer.Start done, state=%s", a.GetState())
@@ -194,8 +194,8 @@ func (a *Asynchronizer) Start(ctx context.Context) {
 // Stop 停止异步处理
 // 注意：Asynchronizer本身不执行停止操作，由Controller通过关闭channel来触发退出
 func (a *Asynchronizer) Stop() {
-	a.SetState(CompStateStopping)
-	lg.DftLgr.Info("Asynchronizer.Stop called, state=%s", a.GetState())
+	a.SetState(CompStateStopped)
+	lg.DftLgr.Info("Asynchronizer.Stop called")
 }
 
 // Add 增加WaitGroup计数
