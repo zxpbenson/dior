@@ -67,11 +67,13 @@ func (s *NSQSource) Start(ctx context.Context) {
 		if err != nil {
 			lg.DftLgr.Error("NSQSource.Start connect to nsqds fail, nsqds: %v, err: %v", s.nsqdTCPAddresses, err)
 		}
+		lg.DftLgr.Info("NSQSource.Start connect to nsqds %s", s.nsqdTCPAddresses)
 	} else if len(s.lookupdHTTPAddresses) > 0 {
 		err := s.consumer.ConnectToNSQLookupds(s.lookupdHTTPAddresses)
 		if err != nil {
 			lg.DftLgr.Error("NSQSource.Start connect to nsqlookupds fail, nsqlookupds: %v, err: %v", s.lookupdHTTPAddresses, err)
 		}
+		lg.DftLgr.Info("NSQSource.Start connect to nsqlookupds %s", s.lookupdHTTPAddresses)
 	} else {
 		lg.DftLgr.Error("NSQSource.Start requires either nsqds or nsqlookupds")
 		return
