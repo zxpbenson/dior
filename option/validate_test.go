@@ -57,11 +57,11 @@ func TestOptions_Validate(t *testing.T) {
 		{
 			name: "Valid NSQ Source",
 			opts: &Options{
-				Src:                    "nsq",
-				SrcLookupdTCPAddresses: []string{"localhost:4161"},
-				SrcChannel:             "ch1",
-				SrcTopic:               "topic1",
-				Dst:                    "nil",
+				Src:                     "nsq",
+				SrcLookupdHTTPAddresses: []string{"localhost:4161"},
+				SrcChannel:              "ch1",
+				SrcTopic:                "topic1",
+				Dst:                     "nil",
 			},
 			wantErr: false,
 		},
